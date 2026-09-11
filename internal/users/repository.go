@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Repository is SQLite access for users.
 type Repository struct {
 	DB *sql.DB
 }

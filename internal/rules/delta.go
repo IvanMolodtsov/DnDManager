@@ -1,3 +1,4 @@
+// Package rules previews character creation and level-up without writing to the database.
 package rules
 
 import (
@@ -12,6 +13,7 @@ const (
 	HPRoll    = "roll"
 )
 
+// Catalog is the subset of catalog.Service the engine needs.
 type Catalog interface {
 	Race(id int64) (*catalog.Race, error)
 	Background(id int64) (*catalog.Background, error)
@@ -20,6 +22,7 @@ type Catalog interface {
 	FeaturesAt(kind string, sourceID int64, level int) ([]catalog.Feature, error)
 }
 
+// ClassProgress is one class (and optional subclass) on a character.
 type ClassProgress struct {
 	ClassID     int64
 	ClassName   string
@@ -36,6 +39,7 @@ type ClassProgress struct {
 	SourceRU    string
 }
 
+// State is a character snapshot used as Preview input.
 type State struct {
 	Level            int
 	Scores           AbilityScores
@@ -65,6 +69,7 @@ func (s State) HasFeature(id int64) bool {
 	return false
 }
 
+// Intent is a create or level-up request (class, HP choice, ASI, language).
 type Intent struct {
 	Kind         string
 	RaceID       int64
@@ -78,6 +83,7 @@ type Intent struct {
 	Lang         string
 }
 
+// FeatureGrant is a newly acquired catalog feature for display and persistence.
 type FeatureGrant struct {
 	ID        int64
 	Name      string
@@ -90,6 +96,7 @@ type FeatureGrant struct {
 	Level     int
 }
 
+// Delta is the result of Preview: scores, HP, class levels, and new features.
 type Delta struct {
 	LevelAfter       int
 	ProficiencyAfter int
@@ -106,10 +113,12 @@ type Delta struct {
 	SubclassNeeded   bool
 }
 
+// Engine computes create and level-up deltas from catalog data.
 type Engine struct {
 	Catalog Catalog
 }
 
+// Preview returns the resulting Delta without mutating current.
 func (e *Engine) Preview(current State, in Intent) (*Delta, error) {
 	switch in.Kind {
 	case IntentCreate:
@@ -121,6 +130,7 @@ func (e *Engine) Preview(current State, in Intent) (*Delta, error) {
 	}
 }
 
+// Apply builds a new State from a Delta.
 func Apply(_ State, d *Delta) State {
 	ids := make([]int64, 0, len(d.FeaturesAdded))
 	for _, f := range d.FeaturesAdded {

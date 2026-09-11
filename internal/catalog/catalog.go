@@ -1,3 +1,7 @@
+// Package catalog is the local PHB 5e (2014) reference data.
+// Russian source URLs follow https://5e14.dnd.su/{type}/{numericId}-{english-slug}/
+// (type = class | race | backgrounds | spells | items). Subclass and feature rows
+// link to the parent page when 5e14 has no dedicated URL.
 package catalog
 
 const (
@@ -7,6 +11,7 @@ const (
 	KindSubclass   = "subclass"
 )
 
+// Race is a playable race or subrace (e.g. hill dwarf) with ability bonuses.
 type Race struct {
 	ID              int64
 	Slug            string
@@ -19,6 +24,7 @@ type Race struct {
 	HPBonusPerLevel int
 }
 
+// Background is a PHB background. AbilityBonuses is empty on 2014 PHB rows.
 type Background struct {
 	ID             int64
 	Slug           string
@@ -29,6 +35,7 @@ type Background struct {
 	AbilityBonuses map[string]int
 }
 
+// Class is a PHB class: hit die, subclass unlock level, and ASI levels.
 type Class struct {
 	ID             int64
 	Slug           string
@@ -42,6 +49,7 @@ type Class struct {
 	AbilityBonuses map[string]int
 }
 
+// HasASI reports whether this class level grants an Ability Score Improvement.
 func (c Class) HasASI(classLevel int) bool {
 	for _, lv := range c.ASILevels {
 		if lv == classLevel {
@@ -51,6 +59,7 @@ func (c Class) HasASI(classLevel int) bool {
 	return false
 }
 
+// Subclass is a class option (archetype). ClassID is the parent class.
 type Subclass struct {
 	ID          int64
 	ClassID     int64
@@ -61,6 +70,7 @@ type Subclass struct {
 	SourceURLRU string
 }
 
+// Feature is a race, background, class, or subclass grant at a given level.
 type Feature struct {
 	ID          int64
 	SourceKind  string
@@ -73,6 +83,7 @@ type Feature struct {
 	SourceURLRU string
 }
 
+// Pick returns ru when lang is "ru" and ru is non-empty; otherwise en.
 func Pick(lang, en, ru string) string {
 	if lang == "ru" && ru != "" {
 		return ru

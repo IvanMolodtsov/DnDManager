@@ -8,6 +8,7 @@ import (
 	"dndmanager/internal/platform"
 )
 
+// CharacterSummary is the campaign page's character row (avoids importing characters).
 type CharacterSummary struct {
 	ID      int64
 	Name    string
@@ -16,16 +17,19 @@ type CharacterSummary struct {
 	OwnerID int64
 }
 
+// CharacterLister is implemented by characters.Service.
 type CharacterLister interface {
 	ListByCampaign(campaignID int64) ([]CharacterSummary, error)
 }
 
+// Controller serves campaign list, create, join, and the table page.
 type Controller struct {
 	Svc        *Service
 	Characters CharacterLister
 	Render     *platform.Renderer
 }
 
+// Mount registers authenticated campaign routes.
 func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
 	mux.Handle("GET /campaigns", auth(http.HandlerFunc(c.list)))
 	mux.Handle("GET /campaigns/new", auth(http.HandlerFunc(c.showCreate)))

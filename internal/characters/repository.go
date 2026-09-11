@@ -7,6 +7,7 @@ import (
 	"dndmanager/internal/rules"
 )
 
+// Repository is SQLite access for live characters, class levels, features, and drafts.
 type Repository struct {
 	DB *sql.DB
 }

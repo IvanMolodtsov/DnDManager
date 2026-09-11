@@ -19,10 +19,12 @@ var (
 
 const inviteAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
+// Service creates campaigns, joins by invite, and checks membership.
 type Service struct {
 	Repo *Repository
 }
 
+// Create inserts a campaign and makes createdBy the Dungeon Master.
 func (s *Service) Create(name string, createdBy int64) (*Campaign, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || utf8.RuneCountInString(name) > 80 {
@@ -39,6 +41,7 @@ func (s *Service) Create(name string, createdBy int64) (*Campaign, error) {
 	return s.Repo.FindByID(id)
 }
 
+// Join adds userID as a Player. Already-members get ErrAlreadyMember.
 func (s *Service) Join(invite string, userID int64) (*Campaign, error) {
 	invite = strings.ToUpper(strings.TrimSpace(invite))
 	if invite == "" {
@@ -77,6 +80,7 @@ func (s *Service) ListForUser(userID int64) ([]CampaignListItem, error) {
 	return s.Repo.ListForUser(userID)
 }
 
+// RequireMember returns the membership or ErrNotMember.
 func (s *Service) RequireMember(campaignID, userID int64) (*Membership, error) {
 	m, err := s.Repo.Membership(campaignID, userID)
 	if err != nil {
@@ -126,6 +130,7 @@ func randomInvite(n int) (string, error) {
 	return string(out), nil
 }
 
+// ErrorKey maps a campaigns error to a locales JSON key.
 func ErrorKey(err error) string {
 	switch {
 	case errors.Is(err, ErrNameRequired):

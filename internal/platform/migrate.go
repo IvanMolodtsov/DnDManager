@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+// Migrate applies new *.sql files in dir (sorted by name) once each.
+// Restart the server after pulling new migration files.
 func Migrate(db *sql.DB, dir string) error {
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS schema_migrations (

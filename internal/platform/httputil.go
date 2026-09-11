@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// Redirect uses HX-Redirect when the request came from HTMX.
 func Redirect(w http.ResponseWriter, r *http.Request, url string) {
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", url)

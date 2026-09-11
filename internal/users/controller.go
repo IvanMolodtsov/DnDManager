@@ -6,12 +6,14 @@ import (
 	"dndmanager/internal/platform"
 )
 
+// Controller serves register, login, logout, and language switch.
 type Controller struct {
 	Svc      *Service
 	Sessions *platform.SessionStore
 	Render   *platform.Renderer
 }
 
+// Mount registers unauthenticated auth routes on mux.
 func (c *Controller) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("GET /register", c.showRegister)
 	mux.HandleFunc("POST /register", c.register)

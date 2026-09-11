@@ -7,6 +7,7 @@ import (
 
 var ErrNotFound = errors.New("catalog entry not found")
 
+// Service reads catalog rows. Lookups return ErrNotFound instead of sql.ErrNoRows.
 type Service struct {
 	Repo *Repository
 }

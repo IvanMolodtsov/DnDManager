@@ -303,6 +303,7 @@ func hitPointGain(hitDie int, mode string, roll int) (int, error) {
 	}
 }
 
+// ValidateStandardArray checks that the six scores are a permutation of StandardArray.
 func ValidateStandardArray(a AbilityScores) error {
 	got := []int{a.STR, a.DEX, a.CON, a.INT, a.WIS, a.CHA}
 	sort.Ints(got)
@@ -316,6 +317,7 @@ func ValidateStandardArray(a AbilityScores) error {
 	return nil
 }
 
+// ValidateASI requires a non-negative split that sums to +2.
 func ValidateASI(a AbilityScores) error {
 	if a.STR < 0 || a.DEX < 0 || a.CON < 0 || a.INT < 0 || a.WIS < 0 || a.CHA < 0 {
 		return ErrASIInvalid

@@ -1,3 +1,4 @@
+// Package characters owns live sheets, creation drafts, the wizard, and level-up.
 package characters
 
 import (
@@ -10,6 +11,7 @@ import (
 	"dndmanager/internal/rules"
 )
 
+// Character is a live sheet: scores, HP, class levels, and granted features.
 type Character struct {
 	ID               int64
 	Name             string
@@ -40,6 +42,7 @@ func (c *Character) Scores() rules.AbilityScores {
 	return rules.AbilityScores{STR: c.STR, DEX: c.DEX, CON: c.CON, INT: c.INT, WIS: c.WIS, CHA: c.CHA}
 }
 
+// State is the snapshot the rules engine uses for previews.
 func (c *Character) State() rules.State {
 	ids := make([]int64, 0, len(c.Features))
 	for _, f := range c.Features {
@@ -57,6 +60,7 @@ func (c *Character) State() rules.State {
 	}
 }
 
+// ClassLine is a display string like "Fighter 3 (Champion) / Wizard 1".
 func (c *Character) ClassLine() string {
 	if len(c.ClassLevels) == 0 {
 		return ""
@@ -78,6 +82,7 @@ func (c *Character) ClassLine() string {
 	return out
 }
 
+// Draft is an in-progress wizard, one per owner+campaign.
 type Draft struct {
 	ID           int64
 	OwnerID      int64
@@ -111,6 +116,7 @@ func parseScoresJSON(s string) (rules.AbilityScores, bool) {
 	return a, true
 }
 
+// ScoreRow is one ability on the wizard scores step (base + bonus = total).
 type ScoreRow struct {
 	Key      string
 	LabelKey string
@@ -149,6 +155,7 @@ func formatMod(m int) string {
 	return strconv.Itoa(m)
 }
 
+// BonusLine is a labeled race/background/class bonus for the wizard UI.
 type BonusLine struct {
 	Label string
 	Text  string

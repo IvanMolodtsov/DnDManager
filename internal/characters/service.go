@@ -19,6 +19,7 @@ var (
 	ErrNotOwner     = errors.New("not character owner")
 )
 
+// Service hydrates sheets, persists drafts, and applies confirmed progression.
 type Service struct {
 	Repo      *Repository
 	Campaigns *campaigns.Service
@@ -70,6 +71,7 @@ func (s *Service) ListByCampaign(campaignID int64) ([]campaigns.CharacterSummary
 	return out, nil
 }
 
+// CanView allows the owner (editable) or the campaign DM (read-only).
 func (s *Service) CanView(ch *Character, userID int64) (readonly bool, err error) {
 	if ch.OwnerID == userID {
 		return false, nil
@@ -122,6 +124,7 @@ func (s *Service) ResetDraft(d *Draft) error {
 	return s.Repo.UpdateDraft(d)
 }
 
+// ConfirmDraft runs IntentCreate and inserts the live character.
 func (s *Service) ConfirmDraft(d *Draft, ownerID int64, lang string) (*Character, error) {
 	if d.OwnerID != ownerID {
 		return nil, ErrForbidden
@@ -188,6 +191,7 @@ func (s *Service) PreviewLevelUp(ch *Character, in rules.Intent) (*rules.Delta, 
 	return s.Rules.Preview(ch.State(), in)
 }
 
+// ApplyLevelUp previews IntentLevelUp and writes the new scores, HP, and features.
 func (s *Service) ApplyLevelUp(ch *Character, ownerID int64, in rules.Intent) (*Character, error) {
 	if err := s.RequireOwner(ch, ownerID); err != nil {
 		return nil, err
@@ -335,6 +339,7 @@ func (s *Service) hydrate(ch *Character) error {
 	return nil
 }
 
+// Localize fills class/feature display names from EN/RU catalog fields.
 func (s *Service) Localize(ch *Character, lang string) {
 	if ch.Race != nil {
 		_ = lang
@@ -393,6 +398,7 @@ func itoa(n int) string {
 	return strconv.Itoa(n)
 }
 
+// ErrorKey maps a characters or rules error to a locales JSON key.
 func ErrorKey(err error) string {
 	switch {
 	case errors.Is(err, ErrNameRequired):

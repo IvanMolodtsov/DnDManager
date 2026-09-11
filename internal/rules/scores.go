@@ -2,6 +2,7 @@ package rules
 
 import "strings"
 
+// AbilityScores is STR/DEX/CON/INT/WIS/CHA.
 type AbilityScores struct {
 	STR int `json:"str"`
 	DEX int `json:"dex"`
@@ -11,6 +12,7 @@ type AbilityScores struct {
 	CHA int `json:"cha"`
 }
 
+// StandardArray is the PHB 5e assignment {15, 14, 13, 12, 10, 8}.
 var StandardArray = []int{15, 14, 13, 12, 10, 8}
 
 var AbilityKeys = []string{"str", "dex", "con", "int", "wis", "cha"}
@@ -85,6 +87,7 @@ func (a AbilityScores) Map() map[string]int {
 	}
 }
 
+// Modifier is (score-10)/2, rounding down.
 func Modifier(score int) int {
 	m := score - 10
 	if m >= 0 {
@@ -93,6 +96,7 @@ func Modifier(score int) int {
 	return (m - 1) / 2
 }
 
+// ProficiencyBonus is 2 + floor((level-1)/4), clamped to levels 1–20.
 func ProficiencyBonus(totalLevel int) int {
 	if totalLevel < 1 {
 		totalLevel = 1
@@ -103,6 +107,7 @@ func ProficiencyBonus(totalLevel int) int {
 	return 2 + (totalLevel-1)/4
 }
 
+// AverageHitPoints is the PHB average: 1 + hitDie/2 (e.g. d10 → 6).
 func AverageHitPoints(hitDie int) int {
 	return 1 + hitDie/2
 }

@@ -10,6 +10,7 @@ import (
 	"dndmanager/internal/rules"
 )
 
+// Controller serves character list, sheet, creation wizard, and level-up.
 type Controller struct {
 	Svc       *Service
 	Campaigns *campaigns.Service
@@ -17,6 +18,7 @@ type Controller struct {
 	Render    *platform.Renderer
 }
 
+// Mount registers authenticated character routes, including HTMX partials.
 func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
 	mux.Handle("GET /characters", auth(http.HandlerFunc(c.list)))
 	mux.Handle("GET /campaigns/{id}/characters/new", auth(http.HandlerFunc(c.showWizard)))

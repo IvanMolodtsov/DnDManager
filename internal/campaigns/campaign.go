@@ -1,3 +1,4 @@
+// Package campaigns owns tables, invite codes, and membership (Dungeon Master vs player).
 package campaigns
 
 import "time"
@@ -7,6 +8,7 @@ const (
 	MemberDM     = "DungeonMaster"
 )
 
+// Campaign is a table. InviteCode is the join token shown to players.
 type Campaign struct {
 	ID         int64
 	Name       string
@@ -15,6 +17,7 @@ type Campaign struct {
 	CreatedAt  time.Time
 }
 
+// Membership is a user's role in a campaign.
 type Membership struct {
 	CampaignID int64
 	UserID     int64
@@ -22,6 +25,7 @@ type Membership struct {
 	Username   string
 }
 
+// CampaignListItem is a campaign plus the current user's membership role.
 type CampaignListItem struct {
 	Campaign
 	MemberRole string

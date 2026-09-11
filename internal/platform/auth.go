@@ -13,6 +13,7 @@ const (
 	langKey
 )
 
+// AuthUser is the request-scoped identity (no password hash).
 type AuthUser struct {
 	ID       int64
 	Username string

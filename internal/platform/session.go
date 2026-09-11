@@ -13,6 +13,7 @@ const (
 	sessionTTL    = 30 * 24 * time.Hour
 )
 
+// Session is a cookie-backed row: optional user, CSRF token, expiry.
 type Session struct {
 	ID        string
 	UserID    sql.NullInt64
@@ -20,6 +21,7 @@ type Session struct {
 	ExpiresAt time.Time
 }
 
+// SessionStore persists sessions in SQLite.
 type SessionStore struct {
 	DB *sql.DB
 }
@@ -69,6 +71,7 @@ func (st *SessionStore) BindUser(sessionID string, userID int64) error {
 	return err
 }
 
+// Rotate destroys oldID (if any) and issues a new session bound to userID.
 func (st *SessionStore) Rotate(oldID string, userID int64) (*Session, error) {
 	_ = st.Destroy(oldID)
 	return st.Create(sql.NullInt64{Int64: userID, Valid: true})

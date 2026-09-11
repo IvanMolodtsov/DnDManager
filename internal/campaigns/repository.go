@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Repository is SQLite access for campaigns and membership.
 type Repository struct {
 	DB *sql.DB
 }

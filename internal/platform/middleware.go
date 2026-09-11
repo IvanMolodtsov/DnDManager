@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// UserLookup loads AuthUser for a session's user id.
 type UserLookup func(id int64) (*AuthUser, error)
 
 func Recover(next http.Handler) http.Handler {
@@ -21,6 +22,7 @@ func Recover(next http.Handler) http.Handler {
 	})
 }
 
+// Sessions loads or creates a session, attaches AuthUser, and sets language on the context.
 func Sessions(store *SessionStore, lookup UserLookup) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +64,7 @@ func Sessions(store *SessionStore, lookup UserLookup) func(http.Handler) http.Ha
 	}
 }
 
+// RequireAuth redirects anonymous users to /login.
 func RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if UserFrom(r.Context()) == nil {
@@ -87,6 +90,7 @@ func RequireAdmin(next http.Handler) http.Handler {
 	})
 }
 
+// Chain wraps h with middleware in the order given (first mw is outermost).
 func Chain(h http.Handler, mws ...func(http.Handler) http.Handler) http.Handler {
 	for i := len(mws) - 1; i >= 0; i-- {
 		h = mws[i](h)

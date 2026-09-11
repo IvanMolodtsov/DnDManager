@@ -8,10 +8,12 @@ import (
 	"strings"
 )
 
+// Bundle holds en/ru message maps loaded from locales/*.json.
 type Bundle struct {
 	messages map[string]map[string]string
 }
 
+// LoadBundle reads locales/en.json and locales/ru.json.
 func LoadBundle(dir string) (*Bundle, error) {
 	b := &Bundle{messages: map[string]map[string]string{}}
 	for _, lang := range []string{"en", "ru"} {
@@ -28,6 +30,7 @@ func LoadBundle(dir string) (*Bundle, error) {
 	return b, nil
 }
 
+// T looks up key in lang, then English, then returns the key itself.
 func (b *Bundle) T(lang, key string) string {
 	if lang != "en" && lang != "ru" {
 		lang = "en"

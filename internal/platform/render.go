@@ -10,11 +10,13 @@ import (
 	"strings"
 )
 
+// Renderer executes HTML templates with the i18n t() helper bound to lang.
 type Renderer struct {
 	base   *template.Template
 	bundle *Bundle
 }
 
+// BaseView is the layout data: user, language, CSRF, and optional Error key.
 type BaseView struct {
 	Title string
 	User  *AuthUser
@@ -37,6 +39,7 @@ func NewBase(r *http.Request, title string) BaseView {
 func (v BaseView) LoggedIn() bool { return v.User != nil }
 func (v BaseView) IsAdmin() bool  { return v.User != nil && v.User.IsAdmin() }
 
+// NewRenderer parses all *.html files under templatesDir.
 func NewRenderer(templatesDir string, bundle *Bundle) (*Renderer, error) {
 	base := template.New("").Funcs(template.FuncMap{
 		"t":      func(string) string { return "" },

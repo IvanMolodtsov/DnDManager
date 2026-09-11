@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 )
 
+// Repository is SQLite access for catalog tables.
 type Repository struct {
 	DB *sql.DB
 }

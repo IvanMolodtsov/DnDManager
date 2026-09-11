@@ -1,3 +1,4 @@
+// Package platform is shared infrastructure: SQLite, migrations, sessions, CSRF, i18n, and HTML rendering.
 package platform
 
 import (
@@ -9,6 +10,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// OpenDB creates dataDir if needed and opens dataDir/dnd.db with foreign keys on.
 func OpenDB(dataDir string) (*sql.DB, error) {
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)

@@ -25,10 +25,12 @@ var (
 
 var usernameRE = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 
+// Service validates credentials and persists users.
 type Service struct {
 	Repo *Repository
 }
 
+// Register creates an account. The first user in the database becomes Admin.
 func (s *Service) Register(username, password, lang string) (*User, error) {
 	username, err := validateUsername(username)
 	if err != nil {
@@ -121,6 +123,7 @@ func (s *Service) AuthUser(id int64) (*platform.AuthUser, error) {
 	return ToAuth(u), nil
 }
 
+// ToAuth copies public fields onto the request-scoped identity used by middleware.
 func ToAuth(u *User) *platform.AuthUser {
 	if u == nil {
 		return nil
@@ -158,6 +161,7 @@ func validatePassword(password string) error {
 	return nil
 }
 
+// ErrorKey maps a users error to a locales JSON key.
 func ErrorKey(err error) string {
 	switch {
 	case errors.Is(err, ErrUsernameRequired):
