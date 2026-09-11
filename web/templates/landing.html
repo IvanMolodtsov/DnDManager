@@ -1,0 +1,11 @@
+{{template "header" .}}
+<section class="mx-auto max-w-xl py-10 text-center">
+  <p class="font-display text-sm uppercase tracking-[0.3em] text-gold/80">{{ t "app.tagline" }}</p>
+  <h1 class="mt-4 font-display text-4xl text-gold">{{ t "landing.cta" }}</h1>
+  <p class="mt-4 text-parchment/80">{{ t "landing.body" }}</p>
+  <div class="mt-8 flex justify-center gap-3">
+    <a class="btn-gold" href="/register">{{ t "nav.register" }}</a>
+    <a class="btn-ghost" href="/login">{{ t "nav.login" }}</a>
+  </div>
+</section>
+{{template "footer" .}}

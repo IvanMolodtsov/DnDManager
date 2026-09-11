@@ -1,0 +1,21 @@
+{{template "header" .}}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="font-display text-3xl text-gold">{{ t "nav.characters" }}</h1>
+  <a class="btn-ghost" href="/campaigns">{{ t "nav.campaigns" }}</a>
+</div>
+{{if .Characters}}
+  <ul class="space-y-3">
+    {{range .Characters}}
+      <li class="card flex items-center justify-between gap-3">
+        <div>
+          <a class="font-display text-lg text-gold hover:underline" href="/characters/{{.ID}}">{{.Name}}</a>
+          <p class="text-xs text-parchment/60">{{.Campaign}} · {{ t "character.level" }} {{.Level}}</p>
+        </div>
+        <a class="btn-ghost" href="/characters/{{.ID}}">{{ t "common.open" }}</a>
+      </li>
+    {{end}}
+  </ul>
+{{else}}
+  <p class="text-parchment/60">{{ t "dash.empty.characters" }}</p>
+{{end}}
+{{template "footer" .}}

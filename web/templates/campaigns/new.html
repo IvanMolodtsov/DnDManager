@@ -1,0 +1,15 @@
+{{template "header" .}}
+<section class="card mx-auto max-w-md">
+  <h1 class="font-display text-2xl text-gold">{{ t "campaign.create.title" }}</h1>
+  {{template "error" .}}
+  <form class="mt-6 space-y-4" method="post" action="/campaigns">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <label class="block text-sm">
+      <span>{{ t "campaign.name" }}</span>
+      <input class="input" type="text" name="name" value="{{.Name}}" required maxlength="80">
+    </label>
+    <button class="btn-gold w-full" type="submit">{{ t "campaign.create.submit" }}</button>
+  </form>
+  <p class="mt-4"><a class="text-sm text-gold/80 hover:text-gold" href="/campaigns">{{ t "common.back" }}</a></p>
+</section>
+{{template "footer" .}}

@@ -1,0 +1,88 @@
+{{template "header" .}}
+<div class="mb-6">
+  <a class="text-sm text-gold/70 hover:text-gold" href="/campaigns/{{.Character.CampaignID}}">{{ t "common.back" }}</a>
+  <div class="mt-2 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="font-display text-3xl text-gold">{{.Character.Name}}</h1>
+      <p class="mt-1 text-sm text-parchment/70">
+        {{ t "character.campaign" }}: {{.Character.Campaign}} ·
+        {{ t "character.owner" }}: {{.Character.OwnerName}} ·
+        {{ t "character.level" }} {{.Character.Level}}
+        {{if .ClassLine}} · {{.ClassLine}}{{end}}
+      </p>
+      {{if .Character.Race}}
+        <p class="mt-1 text-xs text-parchment/60">
+          {{$raceSrc := .Character.Race.Source .Lang}}
+          {{if $raceSrc}}
+            <a class="text-gold/80 hover:underline" href="{{$raceSrc}}" target="_blank" rel="noopener">{{.Character.Race.Name .Lang}}</a>
+          {{else}}
+            {{.Character.Race.Name .Lang}}
+          {{end}}
+          {{if .Character.Background}}
+            {{$bgSrc := .Character.Background.Source .Lang}}
+            ·
+            {{if $bgSrc}}
+              <a class="text-gold/80 hover:underline" href="{{$bgSrc}}" target="_blank" rel="noopener">{{.Character.Background.Name .Lang}}</a>
+            {{else}}
+              {{.Character.Background.Name .Lang}}
+            {{end}}
+          {{end}}
+        </p>
+      {{end}}
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      {{if .ReadOnly}}
+        <span class="rounded-full border border-gold/40 px-3 py-1 text-xs text-gold">{{ t "character.readonly" }}</span>
+      {{else if .IsOwner}}
+        <span class="rounded-full border border-gold/25 px-3 py-1 text-xs text-parchment/70">{{ t "character.yours" }}</span>
+        {{if and .IsOwner (lt .Character.Level 20) .Character.Race}}
+          <a class="btn-gold" href="/characters/{{.Character.ID}}/level-up">{{ t "character.levelup" }}</a>
+        {{end}}
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<section class="card mb-6">
+  <h2 class="font-display text-xl text-gold">{{ t "character.abilities" }}</h2>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "character.abilities.note" }}</p>
+  <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+    <div class="ability-box"><span>{{ t "ability.str" }}</span><strong>{{.Character.STR}}</strong><em>{{modFmt .Character.STR}}</em></div>
+    <div class="ability-box"><span>{{ t "ability.dex" }}</span><strong>{{.Character.DEX}}</strong><em>{{modFmt .Character.DEX}}</em></div>
+    <div class="ability-box"><span>{{ t "ability.con" }}</span><strong>{{.Character.CON}}</strong><em>{{modFmt .Character.CON}}</em></div>
+    <div class="ability-box"><span>{{ t "ability.int" }}</span><strong>{{.Character.INT}}</strong><em>{{modFmt .Character.INT}}</em></div>
+    <div class="ability-box"><span>{{ t "ability.wis" }}</span><strong>{{.Character.WIS}}</strong><em>{{modFmt .Character.WIS}}</em></div>
+    <div class="ability-box"><span>{{ t "ability.cha" }}</span><strong>{{.Character.CHA}}</strong><em>{{modFmt .Character.CHA}}</em></div>
+  </div>
+</section>
+
+<div class="grid gap-4 md:grid-cols-3">
+  <section class="card">
+    <h3 class="font-display text-gold">{{ t "character.slot.hp" }}</h3>
+    <p class="mt-2 text-2xl text-parchment">{{.Character.HPCurrent}} / {{.Character.HPMax}}</p>
+    <p class="mt-1 text-xs text-parchment/50">{{ t "character.proficiency" }} +{{.Character.ProficiencyBonus}}</p>
+  </section>
+  <section class="slot-card">
+    <h3>{{ t "character.slot.inventory" }}</h3>
+    <p>{{ t "character.slot.later" }}</p>
+  </section>
+  <section class="card">
+    <h3 class="font-display text-gold">{{ t "character.features" }}</h3>
+    {{if .Character.Features}}
+      <ul class="mt-2 space-y-1 text-sm">
+        {{range .Character.Features}}
+          <li>
+            {{if .SourceURL}}
+              <a class="text-gold hover:underline" href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Name}}</a>
+            {{else}}
+              {{.Name}}
+            {{end}}
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="mt-2 text-sm text-parchment/45">{{ t "character.slot.later" }}</p>
+    {{end}}
+  </section>
+</div>
+{{template "footer" .}}

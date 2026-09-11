@@ -1,0 +1,24 @@
+{{template "header" .}}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="font-display text-3xl text-gold">{{ t "nav.campaigns" }}</h1>
+  <div class="flex gap-2">
+    <a class="btn-gold" href="/campaigns/new">{{ t "campaign.new" }}</a>
+    <a class="btn-ghost" href="/campaigns/join">{{ t "campaign.join" }}</a>
+  </div>
+</div>
+{{if .Campaigns}}
+  <ul class="space-y-3">
+    {{range .Campaigns}}
+      <li class="card flex items-center justify-between gap-3">
+        <div>
+          <a class="font-display text-lg text-gold hover:underline" href="/campaigns/{{.ID}}">{{.Name}}</a>
+          <p class="text-xs text-parchment/60">{{ t (printf "role.%s" .MemberRole) }}</p>
+        </div>
+        <a class="btn-ghost" href="/campaigns/{{.ID}}">{{ t "common.open" }}</a>
+      </li>
+    {{end}}
+  </ul>
+{{else}}
+  <p class="text-parchment/60">{{ t "dash.empty.campaigns" }}</p>
+{{end}}
+{{template "footer" .}}

@@ -1,0 +1,56 @@
+{{template "header" .}}
+<div class="mb-8 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <h1 class="font-display text-3xl text-gold">{{ t "dash.welcome" }}, {{.User.Username}}</h1>
+    {{if .IsAdmin}}<p class="mt-1 text-sm text-gold/80">{{ t "role.Admin" }}</p>{{end}}
+  </div>
+  <div class="flex gap-2">
+    <a class="btn-gold" href="/campaigns/new">{{ t "campaign.new" }}</a>
+    <a class="btn-ghost" href="/campaigns/join">{{ t "campaign.join" }}</a>
+  </div>
+</div>
+
+<div class="grid gap-6 md:grid-cols-2">
+  <section class="card">
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="font-display text-xl text-gold">{{ t "dash.campaigns" }}</h2>
+      <a class="text-sm text-gold/80 hover:text-gold" href="/campaigns">{{ t "common.open" }}</a>
+    </div>
+    {{if .Campaigns}}
+      <ul class="space-y-2">
+        {{range .Campaigns}}
+          <li>
+            <a class="flex items-center justify-between rounded border border-gold/15 px-3 py-2 hover:border-gold/40" href="/campaigns/{{.ID}}">
+              <span>{{.Name}}</span>
+              <span class="text-xs text-gold/70">{{ t (printf "role.%s" .MemberRole) }}</span>
+            </a>
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="text-sm text-parchment/60">{{ t "dash.empty.campaigns" }}</p>
+    {{end}}
+  </section>
+
+  <section class="card">
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="font-display text-xl text-gold">{{ t "dash.characters" }}</h2>
+      <a class="text-sm text-gold/80 hover:text-gold" href="/characters">{{ t "common.open" }}</a>
+    </div>
+    {{if .Characters}}
+      <ul class="space-y-2">
+        {{range .Characters}}
+          <li>
+            <a class="flex items-center justify-between rounded border border-gold/15 px-3 py-2 hover:border-gold/40" href="/characters/{{.ID}}">
+              <span>{{.Name}}</span>
+              <span class="text-xs text-parchment/60">{{.Campaign}} · {{ t "character.level" }} {{.Level}}</span>
+            </a>
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="text-sm text-parchment/60">{{ t "dash.empty.characters" }}</p>
+    {{end}}
+  </section>
+</div>
+{{template "footer" .}}

@@ -1,0 +1,19 @@
+{{template "header" .}}
+<section class="card mx-auto max-w-md">
+  <h1 class="font-display text-2xl text-gold">{{ t "auth.login.title" }}</h1>
+  {{template "error" .}}
+  <form class="mt-6 space-y-4" method="post" action="/login">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <label class="block text-sm">
+      <span>{{ t "auth.username" }}</span>
+      <input class="input" type="text" name="username" value="{{.Username}}" autocomplete="username" required>
+    </label>
+    <label class="block text-sm">
+      <span>{{ t "auth.password" }}</span>
+      <input class="input" type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <button class="btn-gold w-full" type="submit">{{ t "auth.login.submit" }}</button>
+  </form>
+  <p class="mt-4 text-sm text-parchment/70">{{ t "auth.need.account" }} <a class="text-gold hover:underline" href="/register">{{ t "nav.register" }}</a></p>
+</section>
+{{template "footer" .}}

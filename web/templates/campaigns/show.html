@@ -1,0 +1,65 @@
+{{template "header" .}}
+<div class="mb-6">
+  <a class="text-sm text-gold/70 hover:text-gold" href="/campaigns">{{ t "common.back" }}</a>
+  <h1 class="mt-2 font-display text-3xl text-gold">{{.Campaign.Name}}</h1>
+  <p class="mt-1 text-sm text-parchment/70">
+    {{if .IsDM}}{{ t "campaign.you.dm" }}{{else}}{{ t "campaign.you.player" }}{{end}}
+  </p>
+</div>
+
+<section class="card mb-6">
+  <h2 class="text-sm uppercase tracking-wide text-gold/80">{{ t "campaign.invite" }}</h2>
+  <div class="mt-2 flex flex-wrap items-center gap-3">
+    <code id="invite-code" class="rounded bg-ink px-3 py-2 font-mono text-lg tracking-[0.2em] text-gold">{{.Campaign.InviteCode}}</code>
+    <button type="button" class="btn-ghost" data-copy="#invite-code" data-copied="{{ t "campaign.invite.copied" }}">{{ t "campaign.invite.copy" }}</button>
+  </div>
+</section>
+
+<div class="grid gap-6 md:grid-cols-2">
+  <section class="card">
+    <h2 class="font-display text-xl text-gold">{{ t "campaign.members" }}</h2>
+    <ul class="mt-3 space-y-2">
+      {{range .Members}}
+        <li class="flex items-center justify-between text-sm">
+          <span>{{.Username}}</span>
+          <span class="text-gold/70">{{ t (printf "role.%s" .Role) }}</span>
+        </li>
+      {{end}}
+    </ul>
+  </section>
+
+  <section class="card">
+    <div class="flex items-center justify-between gap-2">
+      <h2 class="font-display text-xl text-gold">{{ t "campaign.characters" }}</h2>
+      <a class="btn-gold" href="/campaigns/{{.Campaign.ID}}/characters/new">{{ t "character.new" }}</a>
+    </div>
+    {{if .Characters}}
+      <ul class="mt-3 space-y-2">
+        {{range .Characters}}
+          <li>
+            <a class="flex items-center justify-between rounded border border-gold/15 px-3 py-2 text-sm hover:border-gold/40" href="/characters/{{.ID}}">
+              <span>{{.Name}}</span>
+              <span class="text-parchment/60">{{.Owner}} · {{ t "character.level" }} {{.Level}}</span>
+            </a>
+          </li>
+        {{end}}
+      </ul>
+    {{else}}
+      <p class="mt-3 text-sm text-parchment/60">{{ t "campaign.empty.characters" }}</p>
+    {{end}}
+  </section>
+</div>
+<script>
+  document.querySelectorAll("[data-copy]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var el = document.querySelector(btn.getAttribute("data-copy"));
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        var prev = btn.textContent;
+        btn.textContent = btn.getAttribute("data-copied") || prev;
+        setTimeout(function () { btn.textContent = prev; }, 1500);
+      });
+    });
+  });
+</script>
+{{template "footer" .}}

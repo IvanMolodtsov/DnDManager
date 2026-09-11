@@ -1,0 +1,38 @@
+<section class="card">
+  <h2 class="font-display text-lg text-gold">{{ t "character.levelup.preview" }}</h2>
+  {{if .Preview}}
+    <dl class="mt-3 space-y-2 text-sm">
+      <div class="flex justify-between gap-3"><dt class="text-parchment/60">{{ t "character.level" }}</dt><dd>{{.Character.Level}} → {{.Preview.LevelAfter}}</dd></div>
+      <div class="flex justify-between gap-3"><dt class="text-parchment/60">{{ t "character.proficiency" }}</dt><dd>+{{.Character.ProficiencyBonus}} → +{{.Preview.ProficiencyAfter}}</dd></div>
+      <div class="flex justify-between gap-3"><dt class="text-parchment/60">{{ t "character.levelup.hp_gain" }}</dt><dd>+{{.Preview.HPGain}} ({{.Character.HPMax}} → {{.Preview.HPAfter}})</dd></div>
+    </dl>
+    <ul class="mt-3 space-y-1 text-sm">
+      {{range .Preview.ClassLevels}}
+        <li>
+          {{if .SourceURL}}<a class="text-gold hover:underline" href="{{.SourceURL}}" target="_blank" rel="noopener">{{.ClassName}}</a>{{else}}{{.ClassName}}{{end}}
+          {{ t "character.level" }} {{.Levels}}{{if .Subclass}} · {{.Subclass}}{{end}}
+        </li>
+      {{end}}
+    </ul>
+    {{if .Preview.FeaturesAdded}}
+      <h3 class="mt-4 text-sm uppercase tracking-wide text-gold/80">{{ t "character.features" }}</h3>
+      <ul class="mt-2 space-y-1 text-sm">
+        {{range .Preview.FeaturesAdded}}
+          <li>
+            {{if .SourceURL}}<a class="text-gold hover:underline" href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Name}}</a>{{else}}{{.Name}}{{end}}
+          </li>
+        {{end}}
+      </ul>
+    {{end}}
+    <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
+      <div class="ability-box"><span>{{ t "ability.str" }}</span><strong>{{.Preview.ScoresAfter.STR}}</strong><em>{{modFmt .Preview.ScoresAfter.STR}}</em></div>
+      <div class="ability-box"><span>{{ t "ability.dex" }}</span><strong>{{.Preview.ScoresAfter.DEX}}</strong><em>{{modFmt .Preview.ScoresAfter.DEX}}</em></div>
+      <div class="ability-box"><span>{{ t "ability.con" }}</span><strong>{{.Preview.ScoresAfter.CON}}</strong><em>{{modFmt .Preview.ScoresAfter.CON}}</em></div>
+      <div class="ability-box"><span>{{ t "ability.int" }}</span><strong>{{.Preview.ScoresAfter.INT}}</strong><em>{{modFmt .Preview.ScoresAfter.INT}}</em></div>
+      <div class="ability-box"><span>{{ t "ability.wis" }}</span><strong>{{.Preview.ScoresAfter.WIS}}</strong><em>{{modFmt .Preview.ScoresAfter.WIS}}</em></div>
+      <div class="ability-box"><span>{{ t "ability.cha" }}</span><strong>{{.Preview.ScoresAfter.CHA}}</strong><em>{{modFmt .Preview.ScoresAfter.CHA}}</em></div>
+    </div>
+  {{else if .Error}}
+    <p class="mt-2 text-sm text-parchment/60">{{ t "character.levelup.preview.wait" }}</p>
+  {{end}}
+</section>

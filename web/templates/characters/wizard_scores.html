@@ -1,0 +1,16 @@
+<div class="grid gap-3 sm:grid-cols-2">
+  {{range $row := .ScoreRows}}
+    <label class="block text-sm">
+      <span>{{ t $row.LabelKey }}</span>
+      {{if ne $row.Bonus 0}}
+        <span class="ml-1 text-xs text-gold/80">{{if gt $row.Bonus 0}}+{{end}}{{$row.Bonus}}</span>
+      {{end}}
+      <select class="input" name="{{$row.Key}}" required>
+        {{range $.ArrayValues}}
+          <option value="{{.}}" {{if eq . $row.Base}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+      <span class="mt-1 block text-xs text-parchment/60">{{ t "wizard.total" }} {{$row.Total}} ({{$row.Mod}})</span>
+    </label>
+  {{end}}
+</div>

@@ -1,0 +1,48 @@
+{{template "header" .}}
+<div class="mb-6">
+  <a class="text-sm text-gold/70 hover:text-gold" href="/characters/{{.Character.ID}}">{{ t "common.back" }}</a>
+  <h1 class="mt-2 font-display text-3xl text-gold">{{ t "character.levelup.title" }}</h1>
+  <p class="mt-1 text-sm text-parchment/70">{{.Character.Name}} · {{ t "character.level" }} {{.Character.Level}}</p>
+</div>
+{{template "error" .}}
+
+<form class="space-y-6" method="post" action="/characters/{{.Character.ID}}/level-up"
+      hx-post="/characters/{{.Character.ID}}/level-up/preview"
+      hx-trigger="change"
+      hx-target="#levelup-dynamic"
+      hx-swap="innerHTML">
+  <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+
+  <section class="card">
+    <label class="block text-sm">
+      <span>{{ t "character.levelup.choose_class" }}</span>
+      <select class="input" name="class_id" required>
+        {{range .Classes}}
+          <option value="{{.ID}}" {{if eq $.SelectedClass .ID}}selected{{end}}>
+            {{.Name $.Lang}}
+            {{if index $.ExistingIDs .ID}}· {{ t "character.level" }} {{index $.ExistingIDs .ID}}{{else}}· {{ t "character.levelup.new_class" }}{{end}}
+          </option>
+        {{end}}
+      </select>
+    </label>
+
+    <fieldset class="mt-4">
+      <legend class="text-sm">{{ t "character.levelup.hp_mode" }}</legend>
+      <label class="mt-2 flex items-center gap-2 text-sm">
+        <input type="radio" name="hp_mode" value="average" {{if ne .HPMode "roll"}}checked{{end}}>
+        <span>{{ t "character.levelup.hp_average" }}</span>
+      </label>
+      <label class="mt-2 flex items-center gap-2 text-sm">
+        <input type="radio" name="hp_mode" value="roll" {{if eq .HPMode "roll"}}checked{{end}}>
+        <span>{{ t "character.levelup.hp_roll" }}</span>
+      </label>
+    </fieldset>
+  </section>
+
+  <div id="levelup-dynamic">
+    {{template "characters/levelup_dynamic.html" .}}
+  </div>
+
+  <button class="btn-gold" type="submit">{{ t "character.levelup.apply" }}</button>
+</form>
+{{template "footer" .}}

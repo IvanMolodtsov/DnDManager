@@ -1,0 +1,137 @@
+{{template "header" .}}
+<section class="card mx-auto max-w-xl">
+  <p class="text-xs uppercase tracking-wide text-gold/70">{{ t "wizard.step" }} {{.Step}} / 4</p>
+  <h1 class="mt-1 font-display text-2xl text-gold">
+    {{if eq .Step 1}}{{ t "wizard.step1.title" }}{{end}}
+    {{if eq .Step 2}}{{ t "wizard.step2.title" }}{{end}}
+    {{if eq .Step 3}}{{ t "wizard.step3.title" }}{{end}}
+    {{if eq .Step 4}}{{ t "wizard.step4.title" }}{{end}}
+  </h1>
+  <p class="mt-1 text-xs text-gold/70">{{.Campaign.Name}}</p>
+  {{if eq .Step 1}}<p class="mt-2 text-sm text-parchment/70">{{ t "wizard.step1.lead" }}</p>{{end}}
+  {{if eq .Step 2}}<p class="mt-2 text-sm text-parchment/70">{{ t "wizard.step2.lead" }}</p>{{end}}
+  {{if eq .Step 3}}<p class="mt-2 text-sm text-parchment/70">{{ t "wizard.step3.lead" }}</p>{{end}}
+  {{if eq .Step 4}}<p class="mt-2 text-sm text-parchment/70">{{ t "wizard.step4.lead" }}</p>{{end}}
+  {{template "error" .}}
+
+  <form class="mt-6 space-y-4" method="post" action="/campaigns/{{.Campaign.ID}}/characters/wizard">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+
+    {{if eq .Step 1}}
+      <label class="block text-sm">
+        <span>{{ t "character.name" }}</span>
+        <input class="input" type="text" name="name" value="{{.Draft.Name}}" required maxlength="80">
+      </label>
+      <label class="block text-sm">
+        <span>{{ t "wizard.race" }}</span>
+        <select class="input" name="race_id" required>
+          <option value="">{{ t "wizard.choose" }}</option>
+          {{range .Races}}
+            <option value="{{.ID}}" {{if eq $.Draft.RaceID .ID}}selected{{end}}>{{.Name $.Lang}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span>{{ t "wizard.background" }}</span>
+        <select class="input" name="background_id" required>
+          <option value="">{{ t "wizard.choose" }}</option>
+          {{range .Backgrounds}}
+            <option value="{{.ID}}" {{if eq $.Draft.BackgroundID .ID}}selected{{end}}>{{.Name $.Lang}}</option>
+          {{end}}
+        </select>
+      </label>
+    {{end}}
+
+    {{if eq .Step 2}}
+      <label class="block text-sm">
+        <span>{{ t "wizard.class" }}</span>
+        <select class="input" name="class_id" required
+                hx-get="/campaigns/{{.Campaign.ID}}/characters/wizard/subclass"
+                hx-target="#subclass-field"
+                hx-swap="innerHTML"
+                hx-trigger="change">
+          <option value="">{{ t "wizard.choose" }}</option>
+          {{range .Classes}}
+            <option value="{{.ID}}" {{if eq $.Draft.ClassID .ID}}selected{{end}}>{{.Name $.Lang}} (d{{.HitDie}})</option>
+          {{end}}
+        </select>
+      </label>
+      <div id="subclass-field">
+        {{template "characters/wizard_subclass.html" .}}
+      </div>
+    {{end}}
+
+    {{if eq .Step 3}}
+      {{if .BonusLines}}
+        <div class="rounded border border-gold/20 bg-ink px-3 py-2 text-sm">
+          <p class="text-xs uppercase tracking-wide text-gold/70">{{ t "wizard.bonuses" }}</p>
+          <ul class="mt-2 space-y-1">
+            {{range .BonusLines}}
+              <li>
+                {{if .URL}}<a class="text-gold hover:underline" href="{{.URL}}" target="_blank" rel="noopener">{{.Text}}</a>{{else}}{{.Text}}{{end}}
+              </li>
+            {{end}}
+          </ul>
+        </div>
+      {{end}}
+      <p class="text-xs text-parchment/50">{{ t "wizard.assign.hint" }}</p>
+      <div id="score-grid"
+           hx-get="/campaigns/{{.Campaign.ID}}/characters/wizard/scores"
+           hx-trigger="change from:select"
+           hx-include="closest form"
+           hx-target="this"
+           hx-swap="innerHTML">
+        {{template "characters/wizard_scores.html" .}}
+      </div>
+    {{end}}
+
+    {{if eq .Step 4}}
+      {{if .Preview}}
+        <dl class="space-y-2 text-sm">
+          <div class="flex justify-between gap-3"><dt class="text-parchment/60">{{ t "character.name" }}</dt><dd>{{.Draft.Name}}</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-parchment/60">{{ t "character.level" }}</dt><dd>{{.Preview.LevelAfter}}</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-parchment/60">{{ t "character.proficiency" }}</dt><dd>+{{.Preview.ProficiencyAfter}}</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-parchment/60">{{ t "character.slot.hp" }}</dt><dd>{{.Preview.HPAfter}}</dd></div>
+        </dl>
+        <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
+          <div class="ability-box"><span>{{ t "ability.str" }}</span><strong>{{.Preview.ScoresAfter.STR}}</strong><em>{{modFmt .Preview.ScoresAfter.STR}}</em></div>
+          <div class="ability-box"><span>{{ t "ability.dex" }}</span><strong>{{.Preview.ScoresAfter.DEX}}</strong><em>{{modFmt .Preview.ScoresAfter.DEX}}</em></div>
+          <div class="ability-box"><span>{{ t "ability.con" }}</span><strong>{{.Preview.ScoresAfter.CON}}</strong><em>{{modFmt .Preview.ScoresAfter.CON}}</em></div>
+          <div class="ability-box"><span>{{ t "ability.int" }}</span><strong>{{.Preview.ScoresAfter.INT}}</strong><em>{{modFmt .Preview.ScoresAfter.INT}}</em></div>
+          <div class="ability-box"><span>{{ t "ability.wis" }}</span><strong>{{.Preview.ScoresAfter.WIS}}</strong><em>{{modFmt .Preview.ScoresAfter.WIS}}</em></div>
+          <div class="ability-box"><span>{{ t "ability.cha" }}</span><strong>{{.Preview.ScoresAfter.CHA}}</strong><em>{{modFmt .Preview.ScoresAfter.CHA}}</em></div>
+        </div>
+        <ul class="mt-4 space-y-1 text-sm">
+          {{range .Preview.ClassLevels}}
+            <li>
+              {{if .SourceURL}}<a class="text-gold hover:underline" href="{{.SourceURL}}" target="_blank" rel="noopener">{{.ClassName}}</a>{{else}}{{.ClassName}}{{end}}
+              {{ t "character.level" }} {{.Levels}}{{if .Subclass}} · {{.Subclass}}{{end}}
+            </li>
+          {{end}}
+        </ul>
+        <h2 class="mt-4 font-display text-lg text-gold">{{ t "character.features" }}</h2>
+        <ul class="mt-2 space-y-1 text-sm">
+          {{range .Preview.FeaturesAdded}}
+            <li>
+              {{if .SourceURL}}<a class="text-gold hover:underline" href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Name}}</a>{{else}}{{.Name}}{{end}}
+            </li>
+          {{end}}
+        </ul>
+      {{end}}
+    {{end}}
+
+    <div class="flex flex-wrap gap-2 pt-2">
+      {{if gt .Step 1}}
+        <button class="btn-ghost" type="submit" name="action" value="back">{{ t "common.back" }}</button>
+      {{end}}
+      {{if lt .Step 4}}
+        <button class="btn-gold" type="submit" name="action" value="next">{{ t "common.next" }}</button>
+      {{else}}
+        <button class="btn-gold" type="submit" name="action" value="confirm">{{ t "character.create.submit" }}</button>
+      {{end}}
+      <button class="btn-ghost ml-auto text-xs" type="submit" name="action" value="reset">{{ t "wizard.reset" }}</button>
+    </div>
+  </form>
+  <p class="mt-4"><a class="text-sm text-gold/80 hover:text-gold" href="/campaigns/{{.Campaign.ID}}">{{ t "common.cancel" }}</a></p>
+</section>
+{{template "footer" .}}

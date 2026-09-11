@@ -1,0 +1,15 @@
+{{if .SubclassRequired}}
+  <label class="mt-4 block text-sm">
+    <span>{{ t "wizard.subclass" }}</span>
+    <select class="input" name="subclass_id" required>
+      <option value="">{{ t "wizard.choose" }}</option>
+      {{range .Subclasses}}
+        <option value="{{.ID}}" {{if eq $.Draft.SubclassID .ID}}selected{{end}}>{{.Name $.Lang}}</option>
+      {{end}}
+    </select>
+  </label>
+{{else if gt .SubclassAt 1}}
+  <p class="mt-3 text-sm text-parchment/60">{{ t "wizard.subclass.later" }} {{.SubclassAt}}.</p>
+{{else}}
+  <p class="mt-3 text-sm text-parchment/50">{{ t "wizard.subclass.pickclass" }}</p>
+{{end}}

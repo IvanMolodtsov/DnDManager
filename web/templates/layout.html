@@ -1,0 +1,67 @@
+{{define "header"}}
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ t .Title }} · {{ t "app.name" }}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/js/htmx.min.js" defer></script>
+</head>
+<body class="min-h-screen bg-ink text-parchment antialiased" hx-headers='{"X-CSRF-Token": "{{.CSRF}}"}'>
+  <div class="pointer-events-none fixed inset-0 bg-vignette"></div>
+  <header class="relative border-b border-gold/25 bg-ink-soft/80 backdrop-blur">
+    <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <a href="/" class="font-display text-xl tracking-wide text-gold">{{ t "app.name" }}</a>
+      <nav class="flex flex-wrap items-center gap-3 text-sm">
+        {{if .LoggedIn}}
+          <a class="hover:text-gold" href="/campaigns">{{ t "nav.campaigns" }}</a>
+          <a class="hover:text-gold" href="/characters">{{ t "nav.characters" }}</a>
+          {{if .IsAdmin}}
+            <a class="hover:text-gold" href="/admin">{{ t "nav.admin" }}</a>
+          {{end}}
+        {{else}}
+          <a class="hover:text-gold" href="/login">{{ t "nav.login" }}</a>
+          <a class="hover:text-gold" href="/register">{{ t "nav.register" }}</a>
+        {{end}}
+        <div class="flex items-center gap-1 rounded border border-gold/30 px-1 py-0.5">
+          <form method="post" action="/lang">
+            <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+            <input type="hidden" name="lang" value="en">
+            <input type="hidden" name="return" value="{{.Path}}">
+            <button type="submit" class="px-1 {{if eq .Lang "en"}}font-semibold text-gold{{else}}text-parchment/70 hover:text-parchment{{end}}">{{ t "nav.lang.en" }}</button>
+          </form>
+          <span class="text-gold/40">|</span>
+          <form method="post" action="/lang">
+            <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+            <input type="hidden" name="lang" value="ru">
+            <input type="hidden" name="return" value="{{.Path}}">
+            <button type="submit" class="px-1 {{if eq .Lang "ru"}}font-semibold text-gold{{else}}text-parchment/70 hover:text-parchment{{end}}">{{ t "nav.lang.ru" }}</button>
+          </form>
+        </div>
+        {{if .LoggedIn}}
+          <span class="rounded-full border border-gold/40 px-2 py-0.5 text-xs text-gold">
+            {{.User.Username}}{{if .IsAdmin}} · {{ t "role.Admin" }}{{end}}
+          </span>
+          <form method="post" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+            <button type="submit" class="hover:text-gold">{{ t "nav.logout" }}</button>
+          </form>
+        {{end}}
+      </nav>
+    </div>
+  </header>
+  <main class="relative mx-auto max-w-5xl px-4 py-8">
+{{end}}
+
+{{define "footer"}}
+  </main>
+</body>
+</html>
+{{end}}
+
+{{define "error"}}
+  {{if .Error}}
+    <p class="mb-4 rounded border border-rose-400/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-100" role="alert">{{ t .Error }}</p>
+  {{end}}
+{{end}}
