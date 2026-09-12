@@ -1,0 +1,15 @@
+{{if .SubclassRequired}}
+  <section class="card mb-6">
+    <label class="block text-sm">
+      <span>{{ t "wizard.subclass" }} {{ t "wizard.subclass.at" }} {{.SubclassAt}}</span>
+      <select class="input" name="subclass_id" id="levelup-subclass-select" required>
+        <option value="">{{ t "wizard.choose" }}</option>
+        {{range .Subclasses}}
+          <option value="{{.ID}}" {{if eq $.SelectedSubclass .ID}}selected{{end}}>{{.Name $.Lang}}</option>
+        {{end}}
+      </select>
+    </label>
+  </section>
+{{else if .CurrentSubclass}}
+  <p class="mb-4 text-sm text-parchment/70">{{ t "wizard.subclass" }}: {{.CurrentSubclass}}</p>
+{{end}}

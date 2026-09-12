@@ -45,6 +45,9 @@ func (s *Service) FeaturesAt(kind string, sourceID int64, level int) ([]Feature,
 
 func (s *Service) ListItems() ([]Item, error)   { return s.Repo.ListItems() }
 func (s *Service) ListSpells() ([]Spell, error) { return s.Repo.ListSpells() }
+func (s *Service) SearchSpells(q string, limit int) ([]Spell, error) {
+	return s.Repo.SearchSpells(q, limit)
+}
 
 func (s *Service) Item(id int64) (*Item, error) {
 	return wrapNotFound(s.Repo.Item(id))

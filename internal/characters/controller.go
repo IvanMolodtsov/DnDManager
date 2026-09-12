@@ -28,7 +28,16 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("GET /characters/{id}", auth(http.HandlerFunc(c.show)))
 	mux.Handle("GET /characters/{id}/level-up", auth(http.HandlerFunc(c.showLevelUp)))
 	mux.Handle("POST /characters/{id}/level-up/preview", auth(http.HandlerFunc(c.previewLevelUp)))
+	mux.Handle("POST /characters/{id}/level-up/preview-panel", auth(http.HandlerFunc(c.previewLevelUpPanel)))
 	mux.Handle("POST /characters/{id}/level-up", auth(http.HandlerFunc(c.postLevelUp)))
+	mux.Handle("GET /characters/{id}/spells/search", auth(http.HandlerFunc(c.searchSpells)))
+	mux.Handle("POST /characters/{id}/spells", auth(http.HandlerFunc(c.addSpell)))
+	mux.Handle("POST /characters/{id}/spells/{spellID}/prepared", auth(http.HandlerFunc(c.togglePrepared)))
+	mux.Handle("POST /characters/{id}/spells/{spellID}/remove", auth(http.HandlerFunc(c.removeSpell)))
+	mux.Handle("GET /characters/{id}/spells/{spellID}/use", auth(http.HandlerFunc(c.useSpellModal)))
+	mux.Handle("POST /characters/{id}/spells/{spellID}/roll", auth(http.HandlerFunc(c.rollSpell)))
+	mux.Handle("POST /characters/{id}/spells/{spellID}/cast", auth(http.HandlerFunc(c.castSpell)))
+	mux.Handle("POST /characters/{id}/resources/use", auth(http.HandlerFunc(c.spendResource)))
 }
 
 func (c *Controller) base(r *http.Request, title string) platform.BaseView {
@@ -57,11 +66,15 @@ func (c *Controller) list(w http.ResponseWriter, r *http.Request) {
 
 type showView struct {
 	platform.BaseView
-	Character *Character
-	ReadOnly  bool
-	IsOwner   bool
-	IsDM      bool
-	ClassLine string
+	Character      *Character
+	ReadOnly       bool
+	IsOwner        bool
+	IsDM           bool
+	ClassLine      string
+	ResourceGroups []ResourceGroup
+	Prepared       []SpellRow
+	Learned        []SpellRow
+	Tab            string
 }
 
 func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
@@ -82,15 +95,27 @@ func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.Svc.Localize(ch, platform.LangFrom(r.Context()))
-	v := showView{
-		BaseView:  c.base(r, ch.Name),
-		Character: ch,
-		ReadOnly:  readonly,
-		IsOwner:   ch.OwnerID == u.ID,
-		IsDM:      readonly,
-		ClassLine: ch.ClassLine(),
-	}
+	v := c.sheetView(r, ch, readonly)
 	c.Render.Render(w, "characters/show.html", v.Lang, http.StatusOK, v)
+}
+
+func (c *Controller) sheetView(r *http.Request, ch *Character, readonly bool) showView {
+	tab := r.URL.Query().Get("tab")
+	if tab != "learned" {
+		tab = "prepared"
+	}
+	return showView{
+		BaseView:       c.base(r, ch.Name),
+		Character:      ch,
+		ReadOnly:       readonly,
+		IsOwner:        ch.OwnerID == platform.UserFrom(r.Context()).ID,
+		IsDM:           readonly,
+		ClassLine:      ch.ClassLine(),
+		ResourceGroups: resourceGroups(ch.Resources),
+		Prepared:       spellRows(ch, true),
+		Learned:        spellRows(ch, false),
+		Tab:            tab,
+	}
 }
 
 func (c *Controller) memberCampaign(w http.ResponseWriter, r *http.Request) (*campaigns.Campaign, bool) {

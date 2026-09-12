@@ -54,8 +54,27 @@ func TestPHBSeedAndWizardOptions(t *testing.T) {
 	if len(items) != 9 {
 		t.Fatalf("items %d want 9", len(items))
 	}
-	if len(spells) != 8 {
-		t.Fatalf("spells %d want 8", len(spells))
+	if len(spells) != 378 {
+		t.Fatalf("spells %d want 378", len(spells))
+	}
+	var mm *Spell
+	for i := range spells {
+		if spells[i].Slug == "magic-missile" {
+			mm = &spells[i]
+			break
+		}
+	}
+	if mm == nil {
+		t.Fatal("missing magic-missile")
+	}
+	if mm.DamageFormula == "" || mm.DamageType != "force" {
+		t.Fatalf("magic missile formula %+v", mm)
+	}
+	if !strings.Contains(mm.SourceURLRU, "5e14.dnd.su/spells/") || !strings.Contains(mm.SourceURLRU, "-") {
+		t.Fatalf("magic missile invented 5e14 path: %s", mm.SourceURLRU)
+	}
+	if mm.SourceURL == "" || !strings.HasPrefix(mm.SourceURL, "https://www.dnd5eapi.co/api/2014/spells/") {
+		t.Fatalf("magic missile 5eapi %s", mm.SourceURL)
 	}
 
 	var raceCount, classCount int

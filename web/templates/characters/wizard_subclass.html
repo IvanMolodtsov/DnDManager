@@ -1,7 +1,7 @@
 {{if .SubclassRequired}}
   <label class="mt-4 block text-sm">
     <span>{{ t "wizard.subclass" }}</span>
-    <select class="input" name="subclass_id" required>
+    <select class="input" name="subclass_id" id="wizard-subclass-select" required>
       <option value="">{{ t "wizard.choose" }}</option>
       {{range .Subclasses}}
         <option value="{{.ID}}" {{if eq $.Draft.SubclassID .ID}}selected{{end}}>{{.Name $.Lang}}</option>

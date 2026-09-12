@@ -46,6 +46,21 @@ func NewRenderer(templatesDir string, bundle *Bundle) (*Renderer, error) {
 		"mod":    AbilityMod,
 		"modFmt": FormatMod,
 		"add":    func(a, b int) int { return a + b },
+		"slotLabel": func(n int) string {
+			switch n {
+			case 1:
+				return "1st"
+			case 2:
+				return "2nd"
+			case 3:
+				return "3rd"
+			default:
+				if n <= 0 {
+					return ""
+				}
+				return strconv.Itoa(n) + "th"
+			}
+		},
 	})
 	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

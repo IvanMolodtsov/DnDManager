@@ -1,0 +1,28 @@
+{{if .Results}}
+  <ul class="spell-list">
+    {{range .Results}}
+      <li class="spell-row">
+        <div>
+          <span class="text-gold">{{.Name $.Lang}}</span>
+          <p class="text-xs text-parchment/60">
+            {{if eq .Level 0}}{{ t "character.spells.cantrip" }}{{else}}{{ t "character.spells.level" }} {{.Level}}{{end}}
+            {{$stats := .StatsLine 0 1}}{{if $stats}} · {{$stats}}{{end}}
+          </p>
+        </div>
+        <form method="post" action="/characters/{{$.Character.ID}}/spells"
+              hx-post="/characters/{{$.Character.ID}}/spells"
+              hx-target="#sheet-magic" hx-swap="innerHTML">
+          <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+          <input type="hidden" name="spell_id" value="{{.ID}}">
+          <label class="flex items-center gap-2 text-xs text-parchment/70">
+            <input type="checkbox" name="prepared" value="1">
+            {{ t "character.spells.prepare" }}
+          </label>
+          <button class="btn-gold mt-2" type="submit">{{ t "character.spells.add" }}</button>
+        </form>
+      </li>
+    {{end}}
+  </ul>
+{{else if .Query}}
+  <p class="text-sm text-parchment/45">{{ t "character.spells.search.empty" }}</p>
+{{end}}

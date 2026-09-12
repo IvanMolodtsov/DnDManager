@@ -265,3 +265,97 @@ func nullIfZero(id int64) any {
 	}
 	return id
 }
+
+type characterSpellRow struct {
+	SpellID  int64
+	Prepared bool
+}
+
+func (r *Repository) ListCharacterSpells(characterID int64) ([]characterSpellRow, error) {
+	rows, err := r.DB.Query(`
+		SELECT spell_id, prepared FROM character_spells WHERE character_id = ? ORDER BY spell_id`, characterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []characterSpellRow
+	for rows.Next() {
+		var id, prep int64
+		if err := rows.Scan(&id, &prep); err != nil {
+			return nil, err
+		}
+		out = append(out, characterSpellRow{SpellID: id, Prepared: prep != 0})
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) UpsertCharacterSpell(characterID, spellID int64, prepared bool) error {
+	_, err := r.DB.Exec(`
+		INSERT INTO character_spells (character_id, spell_id, prepared) VALUES (?, ?, ?)
+		ON CONFLICT(character_id, spell_id) DO UPDATE SET prepared = excluded.prepared`,
+		characterID, spellID, boolInt(prepared))
+	return err
+}
+
+func (r *Repository) SetPrepared(characterID, spellID int64, prepared bool) error {
+	res, err := r.DB.Exec(`UPDATE character_spells SET prepared = ? WHERE character_id = ? AND spell_id = ?`,
+		boolInt(prepared), characterID, spellID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func (r *Repository) DeleteCharacterSpell(characterID, spellID int64) error {
+	_, err := r.DB.Exec(`DELETE FROM character_spells WHERE character_id = ? AND spell_id = ?`, characterID, spellID)
+	return err
+}
+
+func (r *Repository) ListResources(characterID int64) ([]rules.Pool, error) {
+	rows, err := r.DB.Query(`
+		SELECT kind, slot_level, current, max FROM character_resources
+		WHERE character_id = ? ORDER BY kind, slot_level`, characterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []rules.Pool
+	for rows.Next() {
+		var p rules.Pool
+		if err := rows.Scan(&p.Kind, &p.SlotLevel, &p.Current, &p.Max); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) ReplaceResources(characterID int64, pools []rules.Pool) error {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM character_resources WHERE character_id = ?`, characterID); err != nil {
+		return err
+	}
+	for _, p := range pools {
+		if _, err := tx.Exec(`
+			INSERT INTO character_resources (character_id, kind, slot_level, current, max)
+			VALUES (?, ?, ?, ?, ?)`, characterID, p.Kind, p.SlotLevel, p.Current, p.Max); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func boolInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
+}

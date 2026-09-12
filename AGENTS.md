@@ -1,0 +1,62 @@
+# DnDManager — agent context
+
+Local D&D 5e **2014** campaign/character manager for ~5 people. Owner: Ivan. Repo: https://github.com/IvanMolodtsov/DnDManager. Default branch: **main** (no `master`).
+
+## Stack
+
+- Go + SQLite (`modernc.org/sqlite`). HTMX vendored. EN/RU i18n. **No Node.**
+- Tailwind is **compiled** into `web/static/css/app.css`. **Do not use the Tailwind Play CDN** — it replaced the compiled sheet and broke the look.
+- Run: `go run ./cmd/web` or `scripts/start.ps1`.
+
+## Layout
+
+Spring-style **DTO / Service / Repository / Controller** under `internal/{platform,users,campaigns,catalog,rules,characters}` plus stubs for items/abilities. Templates in `web/templates`.
+
+## Access
+
+- Open registration. First registered user is **Admin**.
+- **DM is campaign-scoped**: the campaign creator is DM of that campaign (not a global role).
+- Join via invite codes.
+- Players edit their own characters; DM view is **read-only for now**.
+
+## Character wizard
+
+Draft until confirm:
+
+1. Name / race / background
+2. Class / subclass (RAW: subclass only when class level grants it)
+3. Assign **15, 14, 13, 12, 10, 8** plus racial bonuses
+4. Confirm
+
+## Level-up
+
+- Choose class each level (multiclass OK).
+- HP: average or IRL roll (1–hit die).
+- ASI is **+2 only** (feat picker is **TODO**).
+- Proficiency bonus from **total** character level, not class level.
+- Preserve subclass `<select>` across HTMX preview (bug: dropdown reset to “choose…”).
+
+## Catalog
+
+- Canonical URLs: `https://5e14.dnd.su/{type}/{id}-{slug}/` (e.g. `/class/104-warlock/`).
+- Discover IDs from 5e14 indexes; **never invent** paths like `/class/warlock/`.
+- Use 5eapi `/api/2014/` when it returns 200.
+- **No scraping article body.**
+- Seed **PHB classes only** (no Artificer, sidekicks, or homebrew). ~378 spells in DB.
+
+## Spells UI
+
+- Prepared spells on the sheet; learned spells on a tab.
+- **Separate resource groups** for multiclass: `spell_slots` (Warlock excluded), `pact` (Warlock only; L4 = **2×2nd-level**, not 3rd), ki, sorcery points, Channel Divinity.
+- Use-spell modal: formula + server roll.
+- **Long rest is TODO.**
+
+## Data
+
+- Migrations `001`–`004`. `data/` is not in git.
+- Restart the server after adding new SQL.
+
+## Process
+
+- Pause and ask Ivan on product forks.
+- Don’t commit secrets. Don’t push unless asked.

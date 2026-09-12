@@ -15,6 +15,7 @@ type levelUpView struct {
 	Classes          []catalog.Class
 	ExistingIDs      map[int64]int
 	SelectedClass    int64
+	SelectedSubclass int64
 	Subclasses       []catalog.Subclass
 	SubclassRequired bool
 	SubclassAt       int
@@ -50,19 +51,19 @@ func (c *Controller) showLevelUp(w http.ResponseWriter, r *http.Request) {
 	}
 	in := c.levelUpIntent(r, ch)
 	v := c.levelUpData(r, ch, in)
-	if prev, err := c.Svc.PreviewLevelUp(ch, in); err == nil {
-		v.Preview = prev
-		v.ASIRequired = prev.ASIRequired
-		v.SubclassRequired = prev.SubclassNeeded
-		v.HitDie = prev.HitDie
-		v.AverageHP = prev.AverageHP
-	} else if v.Error == "" {
-		v.Error = ErrorKey(err)
-	}
+	c.applyLevelUpPreview(&v, ch, in)
 	c.Render.Render(w, "characters/levelup.html", v.Lang, http.StatusOK, v)
 }
 
 func (c *Controller) previewLevelUp(w http.ResponseWriter, r *http.Request) {
+	c.renderLevelUpPreview(w, r, "characters/levelup_dynamic.html")
+}
+
+func (c *Controller) previewLevelUpPanel(w http.ResponseWriter, r *http.Request) {
+	c.renderLevelUpPreview(w, r, "characters/levelup_after_class.html")
+}
+
+func (c *Controller) renderLevelUpPreview(w http.ResponseWriter, r *http.Request, tmpl string) {
 	ch, ok := c.loadLive(w, r)
 	if !ok {
 		return
@@ -74,16 +75,8 @@ func (c *Controller) previewLevelUp(w http.ResponseWriter, r *http.Request) {
 	}
 	in := c.levelUpIntent(r, ch)
 	v := c.levelUpData(r, ch, in)
-	if prev, err := c.Svc.PreviewLevelUp(ch, in); err == nil {
-		v.Preview = prev
-		v.ASIRequired = prev.ASIRequired
-		v.SubclassRequired = prev.SubclassNeeded
-		v.HitDie = prev.HitDie
-		v.AverageHP = prev.AverageHP
-	} else {
-		v.Error = ErrorKey(err)
-	}
-	c.Render.Render(w, "characters/levelup_dynamic.html", v.Lang, http.StatusOK, v)
+	c.applyLevelUpPreview(&v, ch, in)
+	c.Render.Render(w, tmpl, v.Lang, http.StatusOK, v)
 }
 
 func (c *Controller) postLevelUp(w http.ResponseWriter, r *http.Request) {
@@ -101,9 +94,7 @@ func (c *Controller) postLevelUp(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		v := c.levelUpData(r, ch, in)
 		v.Error = ErrorKey(err)
-		if prev, e2 := c.Svc.PreviewLevelUp(ch, in); e2 == nil {
-			v.Preview = prev
-		}
+		c.applyLevelUpPreview(&v, ch, in)
 		c.Render.Render(w, "characters/levelup.html", v.Lang, http.StatusUnprocessableEntity, v)
 		return
 	}
@@ -132,7 +123,7 @@ func (c *Controller) levelUpIntent(r *http.Request, ch *Character) rules.Intent 
 	in := rules.Intent{
 		Kind:       rules.IntentLevelUp,
 		ClassID:    classID,
-		SubclassID: platform.FormInt64(r, "subclass_id"),
+		SubclassID: c.matchingSubclass(classID, platform.FormInt64(r, "subclass_id")),
 		HPMode:     mode,
 		HPRoll:     platform.FormInt(r, "hp_roll"),
 		ASI:        parseASI(r),
@@ -157,18 +148,19 @@ func (c *Controller) levelUpData(r *http.Request, ch *Character, in rules.Intent
 		existing[cl.ClassID] = cl.Levels
 	}
 	v := levelUpView{
-		BaseView:      c.base(r, "character.levelup.title"),
-		Character:     ch,
-		Classes:       classes,
-		ExistingIDs:   existing,
-		SelectedClass: in.ClassID,
-		HPMode:        in.HPMode,
-		HPRoll:        in.HPRoll,
-		ASIA:          firstASIKey(in.ASI, 0),
-		ASIB:          firstASIKey(in.ASI, 1),
-		AbilityKeys:   rules.AbilityKeys,
-		HitDie:        8,
-		AverageHP:     5,
+		BaseView:         c.base(r, "character.levelup.title"),
+		Character:        ch,
+		Classes:          classes,
+		ExistingIDs:      existing,
+		SelectedClass:    in.ClassID,
+		SelectedSubclass: in.SubclassID,
+		HPMode:           in.HPMode,
+		HPRoll:           in.HPRoll,
+		ASIA:             firstASIKey(in.ASI, 0),
+		ASIB:             firstASIKey(in.ASI, 1),
+		AbilityKeys:      rules.AbilityKeys,
+		HitDie:           8,
+		AverageHP:        5,
 	}
 	if in.ClassID != 0 {
 		if class, err := c.Catalog.Class(in.ClassID); err == nil {
@@ -182,6 +174,7 @@ func (c *Controller) levelUpData(r *http.Request, ch *Character, in rules.Intent
 			v.ASIRequired = class.HasASI(nextLevel)
 			subs, _ := c.Catalog.ListSubclasses(in.ClassID)
 			v.Subclasses = subs
+			v.SelectedSubclass = c.matchingSubclass(in.ClassID, in.SubclassID)
 		}
 	}
 	if v.ASIA == "" {
@@ -191,6 +184,31 @@ func (c *Controller) levelUpData(r *http.Request, ch *Character, in rules.Intent
 		v.ASIB = "str"
 	}
 	return v
+}
+
+func (c *Controller) applyLevelUpPreview(v *levelUpView, ch *Character, in rules.Intent) {
+	prev, err := c.Svc.PreviewLevelUp(ch, in)
+	if err != nil {
+		if v.Error == "" {
+			v.Error = ErrorKey(err)
+		}
+		return
+	}
+	v.Preview = prev
+	v.ASIRequired = prev.ASIRequired
+	v.HitDie = prev.HitDie
+	v.AverageHP = prev.AverageHP
+}
+
+func (c *Controller) matchingSubclass(classID, subclassID int64) int64 {
+	if classID == 0 || subclassID == 0 {
+		return 0
+	}
+	sub, err := c.Catalog.Subclass(subclassID)
+	if err != nil || sub.ClassID != classID {
+		return 0
+	}
+	return subclassID
 }
 
 func firstASIKey(a rules.AbilityScores, which int) string {

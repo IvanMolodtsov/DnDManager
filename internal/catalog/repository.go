@@ -164,14 +164,40 @@ func (r *Repository) Item(id int64) (*Item, error) {
 		FROM catalog_items WHERE id = ?`, id))
 }
 
-func (r *Repository) ListSpells() ([]Spell, error) {
-	rows, err := r.DB.Query(`
+const spellSelect = `
 		SELECT id, slug, name_en, name_ru, level, school, ritual, casting_time, spell_range, duration,
-		       components, classes, source_url, source_url_ru
-		FROM catalog_spells ORDER BY level, id`)
+		       components, classes, source_url, source_url_ru,
+		       damage_formula, damage_type, heal_formula, scale_kind, upcast, concentration,
+		       damage_at_slot, damage_at_character
+		FROM catalog_spells`
+
+func (r *Repository) ListSpells() ([]Spell, error) {
+	rows, err := r.DB.Query(spellSelect + ` ORDER BY level, name_en`)
 	if err != nil {
 		return nil, err
 	}
+	return scanSpells(rows)
+}
+
+func (r *Repository) Spell(id int64) (*Spell, error) {
+	return scanSpell(r.DB.QueryRow(spellSelect+` WHERE id = ?`, id))
+}
+
+func (r *Repository) SearchSpells(q string, limit int) ([]Spell, error) {
+	if limit <= 0 || limit > 40 {
+		limit = 20
+	}
+	q = "%" + q + "%"
+	rows, err := r.DB.Query(spellSelect+`
+		WHERE name_en LIKE ? OR name_ru LIKE ? OR slug LIKE ?
+		ORDER BY level, name_en LIMIT ?`, q, q, q, limit)
+	if err != nil {
+		return nil, err
+	}
+	return scanSpells(rows)
+}
+
+func scanSpells(rows *sql.Rows) ([]Spell, error) {
 	defer rows.Close()
 	var out []Spell
 	for rows.Next() {
@@ -182,13 +208,6 @@ func (r *Repository) ListSpells() ([]Spell, error) {
 		out = append(out, *sp)
 	}
 	return out, rows.Err()
-}
-
-func (r *Repository) Spell(id int64) (*Spell, error) {
-	return scanSpell(r.DB.QueryRow(`
-		SELECT id, slug, name_en, name_ru, level, school, ritual, casting_time, spell_range, duration,
-		       components, classes, source_url, source_url_ru
-		FROM catalog_spells WHERE id = ?`, id))
 }
 
 type scanner interface {
@@ -278,15 +297,33 @@ func scanItem(row scanner) (*Item, error) {
 
 func scanSpell(row scanner) (*Spell, error) {
 	sp := &Spell{}
-	var ritual int
-	var classesJSON string
+	var ritual, upcast, conc int
+	var classesJSON, slotJSON, charJSON string
 	if err := row.Scan(&sp.ID, &sp.Slug, &sp.NameEN, &sp.NameRU, &sp.Level, &sp.School, &ritual,
-		&sp.CastingTime, &sp.Range, &sp.Duration, &sp.Components, &classesJSON, &sp.SourceURL, &sp.SourceURLRU); err != nil {
+		&sp.CastingTime, &sp.Range, &sp.Duration, &sp.Components, &classesJSON, &sp.SourceURL, &sp.SourceURLRU,
+		&sp.DamageFormula, &sp.DamageType, &sp.HealFormula, &sp.ScaleKind, &upcast, &conc,
+		&slotJSON, &charJSON); err != nil {
 		return nil, err
 	}
 	sp.Ritual = ritual != 0
+	sp.Upcast = upcast != 0
+	sp.Concentration = conc != 0
 	sp.Classes = parseStringSlice(classesJSON)
+	sp.DamageAtSlot = parseStringMap(slotJSON)
+	sp.DamageAtCharacter = parseStringMap(charJSON)
 	return sp, nil
+}
+
+func parseStringMap(s string) map[string]string {
+	out := map[string]string{}
+	if s == "" {
+		return out
+	}
+	_ = json.Unmarshal([]byte(s), &out)
+	if out == nil {
+		return map[string]string{}
+	}
+	return out
 }
 
 func parseStringSlice(s string) []string {

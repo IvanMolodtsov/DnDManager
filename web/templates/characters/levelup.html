@@ -10,13 +10,19 @@
       hx-post="/characters/{{.Character.ID}}/level-up/preview"
       hx-trigger="change"
       hx-target="#levelup-dynamic"
-      hx-swap="innerHTML">
+      hx-swap="innerHTML"
+      hx-include="this">
   <input type="hidden" name="csrf_token" value="{{.CSRF}}">
 
   <section class="card">
     <label class="block text-sm">
       <span>{{ t "character.levelup.choose_class" }}</span>
-      <select class="input" name="class_id" required>
+      <select class="input" name="class_id" required
+              hx-post="/characters/{{.Character.ID}}/level-up/preview-panel"
+              hx-target="#levelup-after-class"
+              hx-swap="innerHTML"
+              hx-include="closest form"
+              hx-trigger="change consume">
         {{range .Classes}}
           <option value="{{.ID}}" {{if eq $.SelectedClass .ID}}selected{{end}}>
             {{.Name $.Lang}}
@@ -39,8 +45,8 @@
     </fieldset>
   </section>
 
-  <div id="levelup-dynamic">
-    {{template "characters/levelup_dynamic.html" .}}
+  <div id="levelup-after-class">
+    {{template "characters/levelup_after_class.html" .}}
   </div>
 
   <button class="btn-gold" type="submit">{{ t "character.levelup.apply" }}</button>
