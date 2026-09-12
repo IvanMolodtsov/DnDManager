@@ -1,6 +1,8 @@
 package characters
 
 import (
+	"strings"
+
 	"dndmanager/internal/catalog"
 	"dndmanager/internal/rules"
 )
@@ -103,6 +105,63 @@ func spellRows(ch *Character, preparedOnly bool) []SpellRow {
 			Stats:    ls.Spell.StatsLine(slot, ch.Level),
 			CanUse:   ls.Prepared && canCast(ch, ls.Spell),
 			SlotHint: slot,
+		})
+	}
+	return out
+}
+
+// SkillRow is one derived skill on the sheet.
+type SkillRow struct {
+	Slug       string
+	Name       string
+	Ability    string
+	Bonus      int
+	Proficient bool
+	Expertise  bool
+	Formula    string
+	SourceURL  string
+}
+
+// SaveRow is one derived saving throw on the sheet.
+type SaveRow struct {
+	Ability    string
+	Score      int
+	Bonus      int
+	Proficient bool
+	Formula    string
+}
+
+func skillRows(ch *Character, lang string) []SkillRow {
+	marks := map[string]rules.SkillMark{}
+	for _, m := range ch.SkillMarks {
+		marks[m.Slug] = m
+	}
+	out := make([]SkillRow, 0, len(rules.Skills))
+	for _, sk := range rules.Skills {
+		m := marks[sk.Slug]
+		m.Slug = sk.Slug
+		b := rules.SkillBonus(ch.Scores(), ch.Level, m)
+		out = append(out, SkillRow{
+			Slug: sk.Slug, Name: catalog.Pick(lang, sk.NameEN, sk.NameRU), Ability: sk.Ability, Bonus: b,
+			Proficient: m.Proficient, Expertise: m.Expertise,
+			Formula: rules.CheckFormula(b), SourceURL: sk.SourceURL,
+		})
+	}
+	return out
+}
+
+func saveRows(ch *Character) []SaveRow {
+	marks := map[string]rules.SaveMark{}
+	for _, m := range ch.SaveMarks {
+		marks[strings.ToLower(m.Ability)] = m
+	}
+	out := make([]SaveRow, 0, len(rules.AbilityKeys))
+	for _, ab := range rules.AbilityKeys {
+		m := marks[ab]
+		m.Ability = ab
+		b := rules.SaveBonus(ch.Scores(), ch.Level, m)
+		out = append(out, SaveRow{
+			Ability: ab, Score: ch.Scores().Get(ab), Bonus: b, Proficient: m.Proficient, Formula: rules.CheckFormula(b),
 		})
 	}
 	return out

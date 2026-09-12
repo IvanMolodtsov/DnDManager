@@ -6,7 +6,7 @@ Local D&D 5e **2014** campaign/character manager for ~5 people. Owner: Ivan. Rep
 
 - Go + SQLite (`modernc.org/sqlite`). HTMX vendored. EN/RU i18n. **No Node.**
 - Tailwind is **compiled** into `web/static/css/app.css`. **Do not use the Tailwind Play CDN** — it replaced the compiled sheet and broke the look.
-- Run: `go run ./cmd/web` or `scripts/start.ps1`.
+- Run: `scripts/start.ps1` (Air hot reload) or `go run ./cmd/web`. Config: `.air.toml`.
 
 ## Layout
 
@@ -51,9 +51,15 @@ Draft until confirm:
 - Use-spell modal: formula + server roll.
 - **Long rest is TODO.**
 
+## Skills
+
+- Block under ability scores: six **saving throws** + 18 **skills**. Bonus is derived: ability mod + PB (×2 expertise). Recalculates after ASI / level / PB. **Item bonuses TODO.**
+- Auto-grant class saves and PHB background (and a few race) skills; owner can toggle proficient / expertise freely.
+- Check / Save: same modal as spells (`1d20+bonus`, IRL + server roll). DM read-only.
+
 ## Data
 
-- Migrations `001`–`004`. `data/` is not in git.
+- Migrations `001`–`005`. `data/` is not in git.
 - Restart the server after adding new SQL.
 
 ## Process

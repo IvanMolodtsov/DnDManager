@@ -1,0 +1,17 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/web.exe ./cmd/web"
+  bin = "./tmp/web.exe"
+  include_ext = ["go", "html", "json", "sql", "css"]
+  exclude_dir = ["tmp", "data", ".git", ".cursor", "node_modules"]
+  delay = 400
+  send_interrupt = true
+  kill_delay = 500
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true
