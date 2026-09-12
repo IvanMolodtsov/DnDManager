@@ -24,19 +24,21 @@ type Catalog interface {
 
 // ClassProgress is one class (and optional subclass) on a character.
 type ClassProgress struct {
-	ClassID     int64
-	ClassName   string
-	ClassNameEN string
-	ClassNameRU string
-	Levels      int
-	SubclassID  int64
-	Subclass    string
-	SubclassEN  string
-	SubclassRU  string
-	HitDie      int
-	SourceURL   string
-	SourceEN    string
-	SourceRU    string
+	ClassID      int64
+	Slug         string
+	ClassName    string
+	ClassNameEN  string
+	ClassNameRU  string
+	Levels       int
+	SubclassID   int64
+	SubclassSlug string
+	Subclass     string
+	SubclassEN   string
+	SubclassRU   string
+	HitDie       int
+	SourceURL    string
+	SourceEN     string
+	SourceRU     string
 }
 
 // State is a character snapshot used as Preview input.

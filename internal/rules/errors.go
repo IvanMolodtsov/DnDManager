@@ -15,4 +15,8 @@ var (
 	ErrHPRoll             = errors.New("hit point roll must be between 1 and the hit die")
 	ErrMaxLevel           = errors.New("character is already level 20")
 	ErrCatalog            = errors.New("catalog entry missing")
+	ErrResourceEmpty      = errors.New("not enough of that resource")
+	ErrSpellNotPrepared   = errors.New("spell is not prepared")
+	ErrSpellNotLearned    = errors.New("spell is not learned")
+	ErrBadFormula         = errors.New("unrecognized dice formula")
 )

@@ -1,0 +1,84 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{.Spell.Name .Lang}}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('spell-use-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-sm text-parchment/70">
+    {{if eq .Spell.Level 0}}{{ t "character.spells.cantrip" }}{{else}}{{ t "character.spells.level" }} {{.Spell.Level}}{{end}}
+    {{if .Stats}} · {{.Stats}}{{end}}
+  </p>
+  {{template "error" .}}
+  <p class="mt-3 text-sm">{{ t "character.spells.irl" }}</p>
+  <p class="mt-1 font-mono text-gold">
+    {{if .Formula}}{{.Formula}}{{if .Spell.DamageType}} {{.Spell.DamageType}}{{end}}{{else if .Heal}}{{.Heal}}{{else}}{{ t "character.spells.no_formula" }}{{end}}
+  </p>
+
+  <form id="spell-use-form" class="mt-4 space-y-3">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    {{if gt .Spell.Level 0}}
+      {{if and .HasPact .HasSlots}}
+        <fieldset>
+          <legend class="text-sm text-parchment/70">{{ t "character.spells.pool" }}</legend>
+          <label class="mt-2 flex items-center gap-2 text-sm">
+            <input type="radio" name="pool" value="pact" {{if eq .DefaultKind "pact"}}checked{{end}}>
+            <span>{{ t "character.resources.pact" }} ({{slotLabel .Pact.SlotLevel}} · {{.Pact.Current}}/{{.Pact.Max}})</span>
+          </label>
+          <label class="mt-2 flex items-center gap-2 text-sm">
+            <input type="radio" name="pool" value="spell_slots" {{if eq .DefaultKind "spell_slots"}}checked{{end}}>
+            <span>{{ t "character.resources.slots" }}</span>
+          </label>
+        </fieldset>
+      {{else if .HasPact}}
+        <input type="hidden" name="pool" value="pact">
+        <p class="text-xs text-parchment/60">{{ t "character.spells.pact_upcast" }} {{slotLabel .Pact.SlotLevel}}</p>
+      {{else if .HasSlots}}
+        <input type="hidden" name="pool" value="spell_slots">
+      {{end}}
+      {{if .HasSlots}}
+        <label class="block text-sm">
+          <span>{{ t "character.spells.slot_level" }}</span>
+          <select class="input" name="slot_level">
+            {{range .SlotChoices}}
+              <option value="{{.}}" {{if eq . $.SlotLevel}}selected{{end}}>{{slotLabel .}}</option>
+            {{end}}
+          </select>
+        </label>
+      {{else}}
+        <input type="hidden" name="slot_level" value="{{.SlotLevel}}">
+      {{end}}
+      <label class="block text-sm">
+        <span>{{ t "character.spells.amount" }}</span>
+        <input class="input" type="number" name="amount" min="1" max="4" value="{{.Amount}}">
+      </label>
+    {{end}}
+
+    <div class="flex flex-wrap gap-2">
+      {{if or .Formula .Heal}}
+        <button class="btn-ghost" type="button"
+                hx-post="/characters/{{.Character.ID}}/spells/{{.Spell.ID}}/roll"
+                hx-target="#spell-use-body" hx-swap="innerHTML"
+                hx-include="#spell-use-form">
+          {{ t "character.spells.autocalc" }}
+        </button>
+      {{end}}
+      {{if .CanCast}}
+        <button class="btn-gold" type="button"
+                hx-post="/characters/{{.Character.ID}}/spells/{{.Spell.ID}}/cast"
+                hx-target="#sheet-magic" hx-swap="innerHTML"
+                hx-include="#spell-use-form">
+          {{ t "character.spells.cast" }}
+        </button>
+      {{else if .ReadOnly}}
+        <p class="text-xs text-parchment/50">{{ t "character.spells.dm_readonly" }}</p>
+      {{end}}
+    </div>
+  </form>
+
+  {{if .Roll}}
+    <div class="mt-4 rounded border border-gold/30 px-3 py-2">
+      <p class="text-xs text-parchment/60">{{ t "character.spells.roll" }}</p>
+      <p class="font-display text-2xl text-gold">{{.Roll.Total}}</p>
+      <p class="text-xs text-parchment/60">{{range $i, $p := .Roll.Parts}}{{if $i}} · {{end}}{{$p}}{{end}}</p>
+    </div>
+  {{end}}
+</div>

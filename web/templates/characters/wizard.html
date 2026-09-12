@@ -49,7 +49,8 @@
                 hx-get="/campaigns/{{.Campaign.ID}}/characters/wizard/subclass"
                 hx-target="#subclass-field"
                 hx-swap="innerHTML"
-                hx-trigger="change">
+                hx-include="closest form"
+                hx-trigger="change from:this">
           <option value="">{{ t "wizard.choose" }}</option>
           {{range .Classes}}
             <option value="{{.ID}}" {{if eq $.Draft.ClassID .ID}}selected{{end}}>{{.Name $.Lang}} (d{{.HitDie}})</option>

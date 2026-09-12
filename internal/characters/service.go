@@ -295,6 +295,7 @@ func (s *Service) hydrate(ch *Character) error {
 	for _, row := range rows {
 		cl := rules.ClassProgress{ClassID: row.ClassID, Levels: row.Levels, SubclassID: row.SubclassID}
 		if class, err := s.Catalog.Class(row.ClassID); err == nil {
+			cl.Slug = class.Slug
 			cl.ClassName = class.Name(lang)
 			cl.HitDie = class.HitDie
 			cl.SourceURL = class.Source(lang)
@@ -305,6 +306,7 @@ func (s *Service) hydrate(ch *Character) error {
 		}
 		if row.SubclassID != 0 {
 			if sub, err := s.Catalog.Subclass(row.SubclassID); err == nil {
+				cl.SubclassSlug = sub.Slug
 				cl.Subclass = sub.Name(lang)
 				cl.SubclassEN = sub.NameEN
 				cl.SubclassRU = sub.NameRU
@@ -336,7 +338,10 @@ func (s *Service) hydrate(ch *Character) error {
 		})
 	}
 	ch.Features = feats
-	return nil
+	if err := s.loadSpells(ch); err != nil {
+		return err
+	}
+	return s.syncResources(ch)
 }
 
 // Localize fills class/feature display names from EN/RU catalog fields.
@@ -423,7 +428,154 @@ func ErrorKey(err error) string {
 		return "error.level.max"
 	case errors.Is(err, ErrNotOwner), errors.Is(err, ErrForbidden):
 		return "error.forbidden"
+	case errors.Is(err, rules.ErrResourceEmpty):
+		return "error.resource.empty"
+	case errors.Is(err, rules.ErrSpellNotPrepared):
+		return "error.spell.not_prepared"
+	case errors.Is(err, rules.ErrSpellNotLearned):
+		return "error.spell.not_learned"
+	case errors.Is(err, rules.ErrBadFormula):
+		return "error.spell.formula"
 	default:
 		return "error.generic"
 	}
+}
+
+func (s *Service) loadSpells(ch *Character) error {
+	rows, err := s.Repo.ListCharacterSpells(ch.ID)
+	if err != nil {
+		return err
+	}
+	var out []LearnedSpell
+	for _, row := range rows {
+		sp, err := s.Catalog.Spell(row.SpellID)
+		if err != nil {
+			continue
+		}
+		out = append(out, LearnedSpell{Spell: *sp, Prepared: row.Prepared})
+	}
+	ch.Spells = out
+	return nil
+}
+
+// TODO: long rest — restore all pool Current to Max, and allow rewriting which
+// learned spells are marked prepared (PHB prepare-after-rest). Not in this pass.
+func (s *Service) syncResources(ch *Character) error {
+	maxes := rules.MaxResources(ch.ClassRules())
+	cur, err := s.Repo.ListResources(ch.ID)
+	if err != nil {
+		return err
+	}
+	next := rules.SyncPools(cur, maxes)
+	if !rules.PoolsEqual(cur, next) {
+		if err := s.Repo.ReplaceResources(ch.ID, next); err != nil {
+			return err
+		}
+	}
+	ch.Resources = next
+	return nil
+}
+
+func (s *Service) learned(ch *Character, spellID int64) (LearnedSpell, bool) {
+	for _, ls := range ch.Spells {
+		if ls.Spell.ID == spellID {
+			return ls, true
+		}
+	}
+	return LearnedSpell{}, false
+}
+
+func (s *Service) AddLearned(ch *Character, ownerID, spellID int64, prepared bool) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	if _, err := s.Catalog.Spell(spellID); err != nil {
+		return err
+	}
+	return s.Repo.UpsertCharacterSpell(ch.ID, spellID, prepared)
+}
+
+func (s *Service) RemoveLearned(ch *Character, ownerID, spellID int64) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	return s.Repo.DeleteCharacterSpell(ch.ID, spellID)
+}
+
+func (s *Service) SetPrepared(ch *Character, ownerID, spellID int64, prepared bool) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	if _, ok := s.learned(ch, spellID); !ok {
+		return rules.ErrSpellNotLearned
+	}
+	return s.Repo.SetPrepared(ch.ID, spellID, prepared)
+}
+
+func (s *Service) SpendResource(ch *Character, ownerID int64, kind string, slotLevel, amount int) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	next, err := rules.Consume(ch.Resources, kind, slotLevel, amount)
+	if err != nil {
+		return err
+	}
+	if err := s.Repo.ReplaceResources(ch.ID, next); err != nil {
+		return err
+	}
+	ch.Resources = next
+	return nil
+}
+
+func (s *Service) CastSpell(ch *Character, ownerID, spellID int64, kind string, slotLevel, amount int) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	ls, ok := s.learned(ch, spellID)
+	if !ok {
+		return rules.ErrSpellNotLearned
+	}
+	if !ls.Prepared {
+		return rules.ErrSpellNotPrepared
+	}
+	if ls.Spell.Level == 0 {
+		return nil
+	}
+	if kind == "" {
+		if rules.HasKind(ch.Resources, rules.KindPact) && !rules.HasKind(ch.Resources, rules.KindSlots) {
+			kind = rules.KindPact
+		} else {
+			kind = rules.KindSlots
+		}
+	}
+	if kind == rules.KindPact {
+		if p, ok := rules.PactPool(ch.Resources); ok {
+			slotLevel = p.SlotLevel
+		}
+	}
+	if slotLevel < ls.Spell.Level && kind == rules.KindSlots {
+		slotLevel = ls.Spell.Level
+	}
+	return s.SpendResource(ch, ownerID, kind, slotLevel, amount)
+}
+
+func (s *Service) RollSpell(ch *Character, spellID int64, slotLevel int) (rules.RollResult, catalog.Spell, error) {
+	ls, ok := s.learned(ch, spellID)
+	if !ok {
+		return rules.RollResult{}, catalog.Spell{}, rules.ErrSpellNotLearned
+	}
+	if slotLevel < 1 {
+		if p, ok := rules.PactPool(ch.Resources); ok && !rules.HasKind(ch.Resources, rules.KindSlots) {
+			slotLevel = p.SlotLevel
+		} else {
+			slotLevel = ls.Spell.Level
+		}
+	}
+	formula, _, heal := ls.Spell.FormulaAt(slotLevel, ch.Level)
+	expr := formula
+	if expr == "" {
+		expr = heal
+	}
+	res, err := rules.RollFormula(expr)
+	return res, ls.Spell, err
 }

@@ -36,6 +36,32 @@ type Character struct {
 	Background       *catalog.Background
 	ClassLevels      []rules.ClassProgress
 	Features         []rules.FeatureGrant
+	Resources        []rules.Pool
+	Spells           []LearnedSpell
+}
+
+// LearnedSpell is a catalog spell on the character (prepared is a subset).
+type LearnedSpell struct {
+	Spell    catalog.Spell
+	Prepared bool
+}
+
+func (c *Character) PreparedSpells() []LearnedSpell {
+	var out []LearnedSpell
+	for _, s := range c.Spells {
+		if s.Prepared {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func (c *Character) ClassRules() []rules.ClassLevel {
+	out := make([]rules.ClassLevel, 0, len(c.ClassLevels))
+	for _, cl := range c.ClassLevels {
+		out = append(out, rules.ClassLevel{Slug: cl.Slug, Levels: cl.Levels, SubclassSlug: cl.SubclassSlug})
+	}
+	return out
 }
 
 func (c *Character) Scores() rules.AbilityScores {

@@ -129,21 +129,103 @@ func (i Item) Source(lang string) string { return Pick(lang, i.SourceURL, i.Sour
 
 // Spell is a later spell-picker row: stats + class list + source links, not lore text.
 type Spell struct {
-	ID          int64
-	Slug        string
-	NameEN      string
-	NameRU      string
-	Level       int
-	School      string
-	Ritual      bool
-	CastingTime string
-	Range       string
-	Duration    string
-	Components  string
-	Classes     []string
-	SourceURL   string
-	SourceURLRU string
+	ID                int64
+	Slug              string
+	NameEN            string
+	NameRU            string
+	Level             int
+	School            string
+	Ritual            bool
+	CastingTime       string
+	Range             string
+	Duration          string
+	Components        string
+	Classes           []string
+	SourceURL         string
+	SourceURLRU       string
+	DamageFormula     string
+	DamageType        string
+	HealFormula       string
+	ScaleKind         string
+	Upcast            bool
+	Concentration     bool
+	DamageAtSlot      map[string]string
+	DamageAtCharacter map[string]string
 }
 
 func (s Spell) Name(lang string) string   { return Pick(lang, s.NameEN, s.NameRU) }
 func (s Spell) Source(lang string) string { return Pick(lang, s.SourceURL, s.SourceURLRU) }
+
+// FormulaAt picks the stored dice string for a slot or character level.
+func (s Spell) FormulaAt(slotLevel, charLevel int) (formula, dmgType, heal string) {
+	formula, dmgType, heal = s.DamageFormula, s.DamageType, s.HealFormula
+	switch s.ScaleKind {
+	case "character":
+		if v := pickLevelMap(s.DamageAtCharacter, charLevel); v != "" {
+			formula = v
+		}
+	case "slot":
+		if v := pickLevelMap(s.DamageAtSlot, slotLevel); v != "" {
+			if s.DamageFormula == "" && s.HealFormula != "" {
+				heal = v
+			} else {
+				formula = v
+			}
+		}
+	}
+	return formula, dmgType, heal
+}
+
+// StatsLine is the sheet subtitle, e.g. "3d4 + 3 force".
+func (s Spell) StatsLine(slotLevel, charLevel int) string {
+	f, dt, heal := s.FormulaAt(slotLevel, charLevel)
+	var parts []string
+	if f != "" {
+		if dt != "" {
+			parts = append(parts, f+" "+dt)
+		} else {
+			parts = append(parts, f)
+		}
+	}
+	if heal != "" {
+		parts = append(parts, heal)
+	}
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += " · "
+		}
+		out += p
+	}
+	return out
+}
+
+func pickLevelMap(m map[string]string, level int) string {
+	if len(m) == 0 {
+		return ""
+	}
+	bestK, bestV := -1, ""
+	for k, v := range m {
+		n := 0
+		for _, r := range k {
+			if r < '0' || r > '9' {
+				n = -1
+				break
+			}
+			n = n*10 + int(r-'0')
+		}
+		if n < 0 {
+			continue
+		}
+		if n == level {
+			return v
+		}
+		if n <= level && n > bestK {
+			bestK, bestV = n, v
+		}
+	}
+	if bestV != "" {
+		return bestV
+	}
+	return ""
+}

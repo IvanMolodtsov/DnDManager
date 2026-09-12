@@ -56,7 +56,15 @@
   </div>
 </section>
 
-<div class="grid gap-4 md:grid-cols-3">
+<div id="sheet-magic" hx-on:close-spell-modal="document.getElementById('spell-use-modal').close()">
+  {{template "characters/sheet_magic.html" .}}
+</div>
+
+<dialog id="spell-use-modal" class="sheet-dialog">
+  <div id="spell-use-body"></div>
+</dialog>
+
+<div class="grid gap-4 md:grid-cols-3 mt-6">
   <section class="card">
     <h3 class="font-display text-gold">{{ t "character.slot.hp" }}</h3>
     <p class="mt-2 text-2xl text-parchment">{{.Character.HPCurrent}} / {{.Character.HPMax}}</p>
@@ -85,4 +93,16 @@
     {{end}}
   </section>
 </div>
+<script>
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    if (e.detail && e.detail.target && e.detail.target.id === 'spell-use-body') {
+      var d = document.getElementById('spell-use-modal');
+      if (d) d.showModal();
+    }
+  });
+  document.body.addEventListener('close-spell-modal', function () {
+    var d = document.getElementById('spell-use-modal');
+    if (d) d.close();
+  });
+</script>
 {{template "footer" .}}

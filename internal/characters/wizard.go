@@ -176,7 +176,7 @@ func (c *Controller) subclassPartial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.ClassID = classID
-	d.SubclassID = 0
+	d.SubclassID = c.matchingSubclass(classID, platform.FormInt64(r, "subclass_id"))
 	v := c.wizardData(r, camp, d)
 	c.Render.Render(w, "characters/wizard_subclass.html", v.Lang, http.StatusOK, v)
 }
