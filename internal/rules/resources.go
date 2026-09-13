@@ -11,6 +11,7 @@ const (
 	KindKi      = "ki"
 	KindSorcery = "sorcery"
 	KindChannel = "channel_divinity"
+	KindItem    = "item"
 )
 
 // ClassLevel is the class-slug snapshot used to compute resource maxima.

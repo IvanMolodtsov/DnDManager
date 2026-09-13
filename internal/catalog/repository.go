@@ -3,6 +3,7 @@ package catalog
 import (
 	"database/sql"
 	"encoding/json"
+	"strings"
 )
 
 // Repository is SQLite access for catalog tables.
@@ -137,14 +138,226 @@ func (r *Repository) Feature(id int64) (*Feature, error) {
 		FROM catalog_features WHERE id = ?`, id))
 }
 
-func (r *Repository) ListItems() ([]Item, error) {
-	rows, err := r.DB.Query(`
+const itemSelect = `
 		SELECT id, slug, name_en, name_ru, kind, cost_gp, weight_lb, damage_dice, damage_type,
-		       armor_class, properties, rarity, source_url, source_url_ru
-		FROM catalog_items ORDER BY id`)
+		       armor_class, properties, rarity, source_url, source_url_ru, desc_en, armor_category,
+		       ac_base, dex_max, stealth_disadv, str_min, weapon_category, versatile_dice,
+		       range_normal, range_long, suggested_slot, requires_attunement, consumable,
+		       charges_max, is_stub, desc_ru, is_base
+		FROM catalog_items`
+
+func (r *Repository) ListItems() ([]Item, error) {
+	rows, err := r.DB.Query(itemSelect + ` ORDER BY kind, name_en`)
 	if err != nil {
 		return nil, err
 	}
+	return scanItems(rows)
+}
+
+func (r *Repository) Item(id int64) (*Item, error) {
+	return scanItem(r.DB.QueryRow(itemSelect+` WHERE id = ?`, id))
+}
+
+func (r *Repository) ItemBySlug(slug string) (*Item, error) {
+	return scanItem(r.DB.QueryRow(itemSelect+` WHERE slug = ?`, slug))
+}
+
+func (r *Repository) ListBaseWeapons() ([]Item, error) {
+	return r.listBases("weapon")
+}
+
+func (r *Repository) ListBaseArmor() ([]Item, error) {
+	return r.listBases("armor")
+}
+
+func (r *Repository) ListBaseJewelry() ([]Item, error) {
+	return r.listBases("jewelry")
+}
+
+func (r *Repository) listBases(kind string) ([]Item, error) {
+	rows, err := r.DB.Query(itemSelect + ` WHERE is_base = 1 ORDER BY kind, armor_category, weapon_category, name_en`)
+	if err != nil {
+		return nil, err
+	}
+	items, err := scanItems(rows)
+	if err != nil {
+		return nil, err
+	}
+	var out []Item
+	for _, it := range items {
+		if baseMatchesKind(it, kind) {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+func baseMatchesKind(it Item, kind string) bool {
+	switch kind {
+	case "armor":
+		return it.IsArmor()
+	case "jewelry":
+		return it.IsJewelry()
+	default:
+		return it.IsWeaponBase()
+	}
+}
+
+func (r *Repository) SearchBaseWeapons(q string, limit int) ([]Item, error) {
+	return r.SearchBases("weapon", q, limit)
+}
+
+func (r *Repository) SearchBaseArmor(q string, limit int) ([]Item, error) {
+	return r.SearchBases("armor", q, limit)
+}
+
+func (r *Repository) SearchBaseJewelry(q string, limit int) ([]Item, error) {
+	return r.SearchBases("jewelry", q, limit)
+}
+
+func (r *Repository) SearchBases(kind, q string, limit int) ([]Item, error) {
+	if limit <= 0 || limit > 40 {
+		limit = 40
+	}
+	items, err := r.listBases(kind)
+	if err != nil {
+		return nil, err
+	}
+	needle := strings.ToLower(strings.TrimSpace(q))
+	if needle == "" {
+		if len(items) > limit {
+			return items[:limit], nil
+		}
+		return items, nil
+	}
+	var out []Item
+	for _, it := range items {
+		if matchesFold(needle, it.NameEN, it.NameRU, it.Slug) {
+			out = append(out, it)
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func (r *Repository) SearchConsumables(q string, limit int) ([]Item, error) {
+	if limit <= 0 || limit > 40 {
+		limit = 20
+	}
+	needle := strings.ToLower(strings.TrimSpace(q))
+	if needle == "" {
+		return nil, nil
+	}
+	rows, err := r.DB.Query(itemSelect + ` WHERE consumable = 1 ORDER BY name_en`)
+	if err != nil {
+		return nil, err
+	}
+	items, err := scanItems(rows)
+	if err != nil {
+		return nil, err
+	}
+	var out []Item
+	for _, it := range items {
+		if matchesFold(needle, it.NameEN, it.NameRU, it.Slug) {
+			out = append(out, it)
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func (r *Repository) ListStatFeatures() ([]StatFeature, error) {
+	rows, err := r.DB.Query(`
+		SELECT id, slug, name_en, name_ru, stat, default_value, origin, source_url, sort_order
+		FROM catalog_stat_features ORDER BY sort_order, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []StatFeature
+	for rows.Next() {
+		f, err := scanStatFeature(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) StatFeature(id int64) (*StatFeature, error) {
+	f, err := scanStatFeature(r.DB.QueryRow(`
+		SELECT id, slug, name_en, name_ru, stat, default_value, origin, source_url, sort_order
+		FROM catalog_stat_features WHERE id = ?`, id))
+	if err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
+func (r *Repository) SearchStatFeatures(q string, limit int) ([]StatFeature, error) {
+	if limit <= 0 || limit > 40 {
+		limit = 20
+	}
+	all, err := r.ListStatFeatures()
+	if err != nil {
+		return nil, err
+	}
+	needle := strings.ToLower(strings.TrimSpace(q))
+	if needle == "" {
+		return nil, nil
+	}
+	var out []StatFeature
+	for _, f := range all {
+		if matchesFold(needle, f.NameEN, f.NameRU, f.Slug, f.Stat) {
+			out = append(out, f)
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func scanStatFeature(row scanner) (StatFeature, error) {
+	var f StatFeature
+	err := row.Scan(&f.ID, &f.Slug, &f.NameEN, &f.NameRU, &f.Stat, &f.DefaultValue, &f.Origin, &f.SourceURL, &f.SortOrder)
+	return f, err
+}
+
+func (r *Repository) SearchItems(q string, limit int) ([]Item, error) {
+	if limit <= 0 || limit > 40 {
+		limit = 20
+	}
+	needle := strings.ToLower(strings.TrimSpace(q))
+	if needle == "" {
+		return nil, nil
+	}
+	rows, err := r.DB.Query(itemSelect + ` ORDER BY is_stub, name_en`)
+	if err != nil {
+		return nil, err
+	}
+	items, err := scanItems(rows)
+	if err != nil {
+		return nil, err
+	}
+	var out []Item
+	for _, it := range items {
+		if matchesFold(needle, it.NameEN, it.NameRU, it.Slug) {
+			out = append(out, it)
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func scanItems(rows *sql.Rows) ([]Item, error) {
 	defer rows.Close()
 	var out []Item
 	for rows.Next() {
@@ -155,13 +368,6 @@ func (r *Repository) ListItems() ([]Item, error) {
 		out = append(out, *item)
 	}
 	return out, rows.Err()
-}
-
-func (r *Repository) Item(id int64) (*Item, error) {
-	return scanItem(r.DB.QueryRow(`
-		SELECT id, slug, name_en, name_ru, kind, cost_gp, weight_lb, damage_dice, damage_type,
-		       armor_class, properties, rarity, source_url, source_url_ru
-		FROM catalog_items WHERE id = ?`, id))
 }
 
 const spellSelect = `
@@ -183,18 +389,45 @@ func (r *Repository) Spell(id int64) (*Spell, error) {
 	return scanSpell(r.DB.QueryRow(spellSelect+` WHERE id = ?`, id))
 }
 
+func (r *Repository) SpellBySlug(slug string) (*Spell, error) {
+	return scanSpell(r.DB.QueryRow(spellSelect+` WHERE slug = ?`, slug))
+}
+
 func (r *Repository) SearchSpells(q string, limit int) ([]Spell, error) {
 	if limit <= 0 || limit > 40 {
 		limit = 20
 	}
-	q = "%" + q + "%"
-	rows, err := r.DB.Query(spellSelect+`
-		WHERE name_en LIKE ? OR name_ru LIKE ? OR slug LIKE ?
-		ORDER BY level, name_en LIMIT ?`, q, q, q, limit)
+	needle := strings.ToLower(strings.TrimSpace(q))
+	if needle == "" {
+		return nil, nil
+	}
+	rows, err := r.DB.Query(spellSelect + ` ORDER BY level, name_en`)
 	if err != nil {
 		return nil, err
 	}
-	return scanSpells(rows)
+	spells, err := scanSpells(rows)
+	if err != nil {
+		return nil, err
+	}
+	var out []Spell
+	for _, sp := range spells {
+		if matchesFold(needle, sp.NameEN, sp.NameRU, sp.Slug) {
+			out = append(out, sp)
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func matchesFold(needle string, fields ...string) bool {
+	for _, f := range fields {
+		if strings.Contains(strings.ToLower(f), needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func scanSpells(rows *sql.Rows) ([]Spell, error) {
@@ -287,11 +520,20 @@ func parseIntSlice(s string) []int {
 func scanItem(row scanner) (*Item, error) {
 	it := &Item{}
 	var propsJSON string
+	var stealth, attune, cons, stub, base int
 	if err := row.Scan(&it.ID, &it.Slug, &it.NameEN, &it.NameRU, &it.Kind, &it.CostGP, &it.WeightLB,
-		&it.DamageDice, &it.DamageType, &it.ArmorClass, &propsJSON, &it.Rarity, &it.SourceURL, &it.SourceURLRU); err != nil {
+		&it.DamageDice, &it.DamageType, &it.ArmorClass, &propsJSON, &it.Rarity, &it.SourceURL, &it.SourceURLRU,
+		&it.DescEN, &it.ArmorCategory, &it.ACBase, &it.DexMax, &stealth, &it.StrMin, &it.WeaponCategory,
+		&it.VersatileDice, &it.RangeNormal, &it.RangeLong, &it.SuggestedSlot, &attune, &cons, &it.ChargesMax, &stub,
+		&it.DescRU, &base); err != nil {
 		return nil, err
 	}
 	it.Properties = parseStringSlice(propsJSON)
+	it.StealthDisadv = stealth != 0
+	it.RequiresAttunement = attune != 0
+	it.Consumable = cons != 0
+	it.IsStub = stub != 0
+	it.IsBase = base != 0
 	return it, nil
 }
 

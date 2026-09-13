@@ -1,4 +1,4 @@
-<div id="sheet-stats">
+<div id="sheet-stats"{{if .OOBCombat}} hx-swap-oob="true"{{end}}>
 <section class="card mb-6">
   <h2 class="font-display text-xl text-gold">{{ t "character.abilities" }}</h2>
   <p class="mt-1 text-xs text-parchment/50">{{ t "character.abilities.note" }}</p>
@@ -42,6 +42,7 @@
             {{.Name}}
           {{end}}
           <span>{{.Ability}}</span>
+          {{if .FromItem}}<span class="inv-tag">{{ t "character.spells.from_item_short" }}</span>{{end}}
         </div>
         <strong>{{bonusFmt .Bonus}}</strong>
         {{if $.IsOwner}}
