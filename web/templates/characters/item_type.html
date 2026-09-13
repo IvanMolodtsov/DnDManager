@@ -1,0 +1,21 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "character.inventory.add" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('item-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "character.inventory.type.note" }}</p>
+  <div class="type-grid">
+    <button class="btn-gold" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/weapons"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "character.inventory.type.weapon" }}</button>
+    <button class="btn-gold" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/consumables"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "character.inventory.type.consumable" }}</button>
+    <button class="btn-gold" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/armor"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "character.inventory.type.armor" }}</button>
+    <button class="btn-gold" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/jewelry"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "character.inventory.type.jewelry" }}</button>
+  </div>
+</div>

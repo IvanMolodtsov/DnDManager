@@ -33,6 +33,7 @@ type useView struct {
 	ReadOnly    bool
 	Roll        *rules.RollResult
 	Amount      int
+	ItemGrant   bool
 }
 
 func (c *Controller) ownerSheet(w http.ResponseWriter, r *http.Request) (*Character, bool) {
@@ -229,7 +230,20 @@ func (c *Controller) buildUse(w http.ResponseWriter, r *http.Request, ch *Charac
 		return useView{}, false
 	}
 	ls, ok := c.Svc.learned(ch, spellID)
-	if !ok {
+	fromItem := false
+	var sp catalog.Spell
+	prepared := false
+	if ok {
+		sp = ls.Spell
+		prepared = ls.Prepared
+		if _, gok := c.Svc.grantedSpell(ch, spellID); gok {
+			fromItem = platform.FormTrim(r, "pool") == rules.KindItem || r.URL.Query().Get("pool") == rules.KindItem
+		}
+	} else if g, gok := c.Svc.grantedSpell(ch, spellID); gok {
+		sp = g.Spell
+		prepared = true
+		fromItem = true
+	} else {
 		http.NotFound(w, r)
 		return useView{}, false
 	}
@@ -237,18 +251,26 @@ func (c *Controller) buildUse(w http.ResponseWriter, r *http.Request, ch *Charac
 	hasSlots := rules.HasKind(ch.Resources, rules.KindSlots)
 	slotLevel := platform.FormInt(r, "slot_level")
 	if slotLevel < 1 {
-		if hasPact && !hasSlots {
+		if hasPact && !hasSlots && !fromItem {
 			slotLevel = pact.SlotLevel
 		} else {
-			slotLevel = ls.Spell.Level
+			slotLevel = sp.Level
 		}
 	}
-	if hasPact && !hasSlots {
+	if hasPact && !hasSlots && !fromItem {
 		slotLevel = pact.SlotLevel
 	}
-	formula, _, heal := ls.Spell.FormulaAt(slotLevel, ch.Level)
+	if slotLevel < sp.Level {
+		slotLevel = sp.Level
+	}
+	formula, _, heal := sp.FormulaAt(slotLevel, ch.Level)
 	kind := platform.FormTrim(r, "pool")
 	if kind == "" {
+		kind = r.URL.Query().Get("pool")
+	}
+	if fromItem {
+		kind = rules.KindItem
+	} else if kind == "" {
 		if hasPact && !hasSlots {
 			kind = rules.KindPact
 		} else {
@@ -256,9 +278,11 @@ func (c *Controller) buildUse(w http.ResponseWriter, r *http.Request, ch *Charac
 		}
 	}
 	var choices []int
-	for lv := ls.Spell.Level; lv <= 9; lv++ {
-		if rules.SlotRemaining(ch.Resources, lv) > 0 {
-			choices = append(choices, lv)
+	if !fromItem {
+		for lv := sp.Level; lv <= 9; lv++ {
+			if rules.SlotRemaining(ch.Resources, lv) > 0 {
+				choices = append(choices, lv)
+			}
 		}
 	}
 	amount := platform.FormInt(r, "amount")
@@ -266,20 +290,21 @@ func (c *Controller) buildUse(w http.ResponseWriter, r *http.Request, ch *Charac
 		amount = 1
 	}
 	return useView{
-		BaseView:    c.base(r, ls.Spell.Name(platform.LangFrom(r.Context()))),
+		BaseView:    c.base(r, sp.Name(platform.LangFrom(r.Context()))),
 		Character:   ch,
-		Spell:       ls.Spell,
-		Stats:       ls.Spell.StatsLine(slotLevel, ch.Level),
+		Spell:       sp,
+		Stats:       sp.StatsLine(slotLevel, ch.Level),
 		Formula:     formula,
 		Heal:        heal,
 		SlotLevel:   slotLevel,
-		HasPact:     hasPact && pact.SlotLevel >= ls.Spell.Level && pact.Current > 0,
-		HasSlots:    hasSlots && len(choices) > 0,
+		HasPact:     !fromItem && hasPact && pact.SlotLevel >= sp.Level && pact.Current > 0,
+		HasSlots:    !fromItem && hasSlots && len(choices) > 0,
 		Pact:        pact,
 		SlotChoices: choices,
 		DefaultKind: kind,
-		CanCast:     !readonly && ls.Prepared && canCast(ch, ls.Spell),
+		CanCast:     !readonly && prepared && (fromItem || canCast(ch, sp)),
 		ReadOnly:    readonly,
 		Amount:      amount,
+		ItemGrant:   fromItem,
 	}, true
 }

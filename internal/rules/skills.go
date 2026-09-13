@@ -33,6 +33,13 @@ var Skills = []Skill{
 	{Slug: "survival", Ability: "wis", NameEN: "Survival", NameRU: "Выживание", SourceURL: "https://www.dnd5eapi.co/api/2014/skills/survival"},
 }
 
+func (s Skill) Name(lang string) string {
+	if lang == "ru" && s.NameRU != "" {
+		return s.NameRU
+	}
+	return s.NameEN
+}
+
 // SkillBySlug returns a PHB skill or false.
 func SkillBySlug(slug string) (Skill, bool) {
 	for _, s := range Skills {

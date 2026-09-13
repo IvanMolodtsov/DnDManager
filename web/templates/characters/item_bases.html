@@ -1,0 +1,24 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t (printf "character.inventory.type.%s" .Kind) }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('item-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-xs text-parchment/50">{{ t (printf "character.inventory.base.search.note.%s" .Kind) }}</p>
+  <label class="block mt-3 text-sm">
+    <span>{{ t (printf "character.inventory.base.search.%s" .Kind) }}</span>
+    <input id="base-search-q" class="input" type="search" name="q" value="{{.Query}}" placeholder="{{ t (printf "character.inventory.base.search.ph.%s" .Kind) }}"
+           hx-get="/characters/{{.Character.ID}}/items/{{.ListPath}}/search"
+           hx-trigger="keyup changed delay:300ms, search"
+           hx-target="#base-search-results" hx-swap="innerHTML"
+           autocomplete="off"
+           autofocus>
+  </label>
+  <div id="base-search-results">
+    {{template "characters/item_base_results.html" .}}
+  </div>
+  <div class="mt-4">
+    <button class="btn-ghost" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/new"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "common.back" }}</button>
+  </div>
+</div>

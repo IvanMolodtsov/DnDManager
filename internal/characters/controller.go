@@ -48,6 +48,27 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("POST /characters/{id}/combat/temp", auth(http.HandlerFunc(c.adjustTempHP)))
 	mux.Handle("POST /characters/{id}/combat/death", auth(http.HandlerFunc(c.toggleDeath)))
 	mux.Handle("POST /characters/{id}/effects/{effectID}/remove", auth(http.HandlerFunc(c.dismissEffect)))
+	mux.Handle("GET /characters/{id}/items/new", auth(http.HandlerFunc(c.newItemModal)))
+	mux.Handle("GET /characters/{id}/items/weapons", auth(http.HandlerFunc(c.weaponBases)))
+	mux.Handle("GET /characters/{id}/items/weapons/search", auth(http.HandlerFunc(c.searchBaseWeapons)))
+	mux.Handle("GET /characters/{id}/items/armor", auth(http.HandlerFunc(c.armorBases)))
+	mux.Handle("GET /characters/{id}/items/armor/search", auth(http.HandlerFunc(c.searchBaseArmor)))
+	mux.Handle("GET /characters/{id}/items/jewelry", auth(http.HandlerFunc(c.jewelryBases)))
+	mux.Handle("GET /characters/{id}/items/jewelry/search", auth(http.HandlerFunc(c.searchBaseJewelry)))
+	mux.Handle("GET /characters/{id}/items/consumables", auth(http.HandlerFunc(c.consumableSearch)))
+	mux.Handle("GET /characters/{id}/items/search", auth(http.HandlerFunc(c.searchItems)))
+	mux.Handle("GET /characters/{id}/items/{itemID}/preview", auth(http.HandlerFunc(c.previewItem)))
+	mux.Handle("GET /characters/{id}/items/{itemID}/rarity", auth(http.HandlerFunc(c.rarityItem)))
+	mux.Handle("GET /characters/{id}/items/{itemID}/configure", auth(http.HandlerFunc(c.configureItem)))
+	mux.Handle("POST /characters/{id}/items/{itemID}/configure", auth(http.HandlerFunc(c.mutateItemFeatures)))
+	mux.Handle("GET /characters/{id}/items/{itemID}/features/search", auth(http.HandlerFunc(c.searchItemFeatures)))
+	mux.Handle("POST /characters/{id}/items/{itemID}/roll", auth(http.HandlerFunc(c.rollCatalogItem)))
+	mux.Handle("POST /characters/{id}/items", auth(http.HandlerFunc(c.addItem)))
+	mux.Handle("POST /characters/{id}/items/{invID}/equip", auth(http.HandlerFunc(c.equipItem)))
+	mux.Handle("POST /characters/{id}/items/{invID}/unequip", auth(http.HandlerFunc(c.unequipItem)))
+	mux.Handle("POST /characters/{id}/items/{invID}/qty", auth(http.HandlerFunc(c.qtyItem)))
+	mux.Handle("POST /characters/{id}/items/{invID}/use", auth(http.HandlerFunc(c.useItem)))
+	mux.Handle("POST /characters/{id}/items/{invID}/remove", auth(http.HandlerFunc(c.removeItem)))
 }
 
 func (c *Controller) base(r *http.Request, title string) platform.BaseView {
@@ -86,9 +107,13 @@ type showView struct {
 	Learned        []SpellRow
 	Skills         []SkillRow
 	Saves          []SaveRow
-	Tab            string
 	Combat         rules.CombatStats
 	OOBCombat      bool
+	Tab            string
+	Equipped       []ItemRow
+	Pack           []ItemRow
+	Consumables    []ItemRow
+	ConflictName   string
 	DefenseLine    string
 }
 
@@ -127,12 +152,16 @@ func (c *Controller) sheetView(r *http.Request, ch *Character, readonly bool) sh
 		IsDM:           readonly,
 		ClassLine:      ch.ClassLine(),
 		ResourceGroups: resourceGroups(ch.Resources),
-		Prepared:       spellRows(ch, true),
-		Learned:        spellRows(ch, false),
+		Prepared:       spellRows(ch, true, platform.LangFrom(r.Context())),
+		Learned:        spellRows(ch, false, platform.LangFrom(r.Context())),
 		Skills:         skillRows(ch, platform.LangFrom(r.Context())),
 		Saves:          saveRows(ch),
-		Tab:            tab,
 		Combat:         rules.DeriveCombat(ch.CombatInput()),
+		DefenseLine:    ch.EquippedGrants().DefenseLine(),
+		Tab:            tab,
+		Equipped:       equippedRows(ch),
+		Pack:           packRows(ch),
+		Consumables:    consumableRows(ch),
 	}
 }
 
