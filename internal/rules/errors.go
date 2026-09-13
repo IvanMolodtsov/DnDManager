@@ -20,4 +20,8 @@ var (
 	ErrSpellNotLearned    = errors.New("spell is not learned")
 	ErrBadFormula         = errors.New("unrecognized dice formula")
 	ErrUnknownCheck       = errors.New("unknown skill or saving throw")
+	ErrSlotOccupied       = errors.New("equipment slot occupied")
+	ErrSlotRequired       = errors.New("equipment slot required")
+	ErrAttunementFull     = errors.New("already attuned to three items")
+	ErrItemNotHeld        = errors.New("item is not on this character")
 )
