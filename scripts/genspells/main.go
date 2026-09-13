@@ -298,6 +298,7 @@ func buildRow(apiIndex string, c *card, api *apiSpell) seedRow {
 	if r.Slug == "" {
 		return seedRow{}
 	}
+	applyPHBFormula(&r)
 	return r
 }
 
