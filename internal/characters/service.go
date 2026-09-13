@@ -341,7 +341,67 @@ func (s *Service) hydrate(ch *Character) error {
 	if err := s.loadSpells(ch); err != nil {
 		return err
 	}
+	if err := s.ensureSkills(ch); err != nil {
+		return err
+	}
 	return s.syncResources(ch)
+}
+
+func (s *Service) ensureSkills(ch *Character) error {
+	raceSlug, bgSlug := "", ""
+	if ch.Race != nil {
+		raceSlug = ch.Race.Slug
+	}
+	if ch.Background != nil {
+		bgSlug = ch.Background.Slug
+	}
+	for _, slug := range rules.GrantedSkillSlugs(raceSlug, bgSlug) {
+		if err := s.Repo.GrantSkillIfNew(ch.ID, slug); err != nil {
+			return err
+		}
+	}
+	var classSlugs []string
+	for _, cl := range ch.ClassLevels {
+		classSlugs = append(classSlugs, cl.Slug)
+	}
+	for _, ab := range rules.GrantedSaveAbilities(classSlugs) {
+		if err := s.Repo.GrantSaveIfNew(ch.ID, ab); err != nil {
+			return err
+		}
+	}
+	skills, err := s.Repo.ListSkills(ch.ID)
+	if err != nil {
+		return err
+	}
+	saves, err := s.Repo.ListSaves(ch.ID)
+	if err != nil {
+		return err
+	}
+	ch.SkillMarks, ch.SaveMarks = skills, saves
+	return nil
+}
+
+func (s *Service) SetSkill(ch *Character, ownerID int64, slug string, proficient, expertise bool) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	if _, ok := rules.SkillBySlug(slug); !ok {
+		return rules.ErrUnknownCheck
+	}
+	if err := s.Repo.UpsertSkill(ch.ID, slug, proficient, expertise); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) SetSave(ch *Character, ownerID int64, ability string, proficient bool) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	if !rules.ValidAbilityKey(ability) {
+		return rules.ErrUnknownCheck
+	}
+	return s.Repo.UpsertSave(ch.ID, strings.ToLower(ability), proficient)
 }
 
 // Localize fills class/feature display names from EN/RU catalog fields.
@@ -436,6 +496,8 @@ func ErrorKey(err error) string {
 		return "error.spell.not_learned"
 	case errors.Is(err, rules.ErrBadFormula):
 		return "error.spell.formula"
+	case errors.Is(err, rules.ErrUnknownCheck):
+		return "error.check.unknown"
 	default:
 		return "error.generic"
 	}

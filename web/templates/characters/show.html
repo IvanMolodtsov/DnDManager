@@ -43,18 +43,7 @@
   </div>
 </div>
 
-<section class="card mb-6">
-  <h2 class="font-display text-xl text-gold">{{ t "character.abilities" }}</h2>
-  <p class="mt-1 text-xs text-parchment/50">{{ t "character.abilities.note" }}</p>
-  <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-    <div class="ability-box"><span>{{ t "ability.str" }}</span><strong>{{.Character.STR}}</strong><em>{{modFmt .Character.STR}}</em></div>
-    <div class="ability-box"><span>{{ t "ability.dex" }}</span><strong>{{.Character.DEX}}</strong><em>{{modFmt .Character.DEX}}</em></div>
-    <div class="ability-box"><span>{{ t "ability.con" }}</span><strong>{{.Character.CON}}</strong><em>{{modFmt .Character.CON}}</em></div>
-    <div class="ability-box"><span>{{ t "ability.int" }}</span><strong>{{.Character.INT}}</strong><em>{{modFmt .Character.INT}}</em></div>
-    <div class="ability-box"><span>{{ t "ability.wis" }}</span><strong>{{.Character.WIS}}</strong><em>{{modFmt .Character.WIS}}</em></div>
-    <div class="ability-box"><span>{{ t "ability.cha" }}</span><strong>{{.Character.CHA}}</strong><em>{{modFmt .Character.CHA}}</em></div>
-  </div>
-</section>
+{{template "characters/sheet_skills.html" .}}
 
 <div id="sheet-magic" hx-on:close-spell-modal="document.getElementById('spell-use-modal').close()">
   {{template "characters/sheet_magic.html" .}}

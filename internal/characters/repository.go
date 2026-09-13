@@ -359,3 +359,83 @@ func boolInt(v bool) int {
 	}
 	return 0
 }
+
+func (r *Repository) ListSkills(characterID int64) ([]rules.SkillMark, error) {
+	rows, err := r.DB.Query(`
+		SELECT skill_slug, proficient, expertise FROM character_skills
+		WHERE character_id = ?`, characterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []rules.SkillMark
+	for rows.Next() {
+		var m rules.SkillMark
+		var p, e int
+		if err := rows.Scan(&m.Slug, &p, &e); err != nil {
+			return nil, err
+		}
+		m.Proficient, m.Expertise = p != 0, e != 0
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) ListSaves(characterID int64) ([]rules.SaveMark, error) {
+	rows, err := r.DB.Query(`
+		SELECT ability, proficient FROM character_saves WHERE character_id = ?`, characterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []rules.SaveMark
+	for rows.Next() {
+		var m rules.SaveMark
+		var p int
+		if err := rows.Scan(&m.Ability, &p); err != nil {
+			return nil, err
+		}
+		m.Proficient = p != 0
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) GrantSkillIfNew(characterID int64, slug string) error {
+	_, err := r.DB.Exec(`
+		INSERT OR IGNORE INTO character_skills (character_id, skill_slug, proficient, expertise)
+		VALUES (?, ?, 1, 0)`, characterID, slug)
+	return err
+}
+
+func (r *Repository) GrantSaveIfNew(characterID int64, ability string) error {
+	_, err := r.DB.Exec(`
+		INSERT OR IGNORE INTO character_saves (character_id, ability, proficient)
+		VALUES (?, ?, 1)`, characterID, ability)
+	return err
+}
+
+func (r *Repository) UpsertSkill(characterID int64, slug string, proficient, expertise bool) error {
+	if expertise {
+		proficient = true
+	}
+	if !proficient {
+		expertise = false
+	}
+	_, err := r.DB.Exec(`
+		INSERT INTO character_skills (character_id, skill_slug, proficient, expertise)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(character_id, skill_slug) DO UPDATE SET
+			proficient = excluded.proficient, expertise = excluded.expertise`,
+		characterID, slug, boolInt(proficient), boolInt(expertise))
+	return err
+}
+
+func (r *Repository) UpsertSave(characterID int64, ability string, proficient bool) error {
+	_, err := r.DB.Exec(`
+		INSERT INTO character_saves (character_id, ability, proficient)
+		VALUES (?, ?, ?)
+		ON CONFLICT(character_id, ability) DO UPDATE SET proficient = excluded.proficient`,
+		characterID, ability, boolInt(proficient))
+	return err
+}

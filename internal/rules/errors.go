@@ -19,4 +19,5 @@ var (
 	ErrSpellNotPrepared   = errors.New("spell is not prepared")
 	ErrSpellNotLearned    = errors.New("spell is not learned")
 	ErrBadFormula         = errors.New("unrecognized dice formula")
+	ErrUnknownCheck       = errors.New("unknown skill or saving throw")
 )

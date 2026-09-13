@@ -9,3 +9,19 @@
 .sheet-dialog::backdrop{background:rgba(0,0,0,.65)}
 .sheet-dialog-inner{padding:1.25rem}
 .btn-gold:disabled,.btn-ghost:disabled{opacity:.4;pointer-events:none}
+.ability-divider{width:70%;margin:.4rem auto .35rem;border:0;border-top:1px solid rgba(212,180,90,.28)}
+.ability-save{display:flex;flex-direction:column;align-items:center;gap:.15rem;font-size:.7rem;color:hsla(41,64%,87%,.7)}
+.ability-save-btn{font-size:.65rem;line-height:1;padding:.15rem .35rem;border:1px solid rgba(212,180,90,.3);border-radius:.2rem;color:rgba(212,180,90,.85)}
+.ability-save-btn:hover{border-color:rgba(212,180,90,.6)}
+.skill-list{column-count:2;column-gap:1.5rem}
+@media (min-width:768px){.skill-list{column-count:3}}
+.skill-row{display:grid;grid-template-columns:minmax(0,1fr) 2.1rem auto;gap:.35rem;align-items:center;padding:.18rem 0;font-size:.8rem;line-height:1.15;break-inside:avoid}
+.skill-row strong{font-family:Palatino Linotype,Palatino,Georgia,serif;color:#d4b45a;text-align:right;font-size:.85rem}
+.skill-name{min-width:0}
+.skill-name a{color:inherit}
+.skill-name a:hover{color:#d4b45a;text-decoration:underline}
+.skill-name span{display:block;font-size:.6rem;text-transform:uppercase;letter-spacing:.04em;color:hsla(41,64%,87%,.45)}
+.skill-actions{display:flex;gap:.15rem;align-items:center}
+.skill-actions button,.skill-actions span{min-width:1.15rem;padding:.05rem .2rem;font-size:.65rem;line-height:1.2;border:1px solid rgba(212,180,90,.22);border-radius:.15rem;color:hsla(41,64%,87%,.4);background:transparent}
+.skill-actions button.on,.skill-actions span.on{color:#d4b45a;border-color:rgba(212,180,90,.55)}
+.skill-actions button:hover{border-color:rgba(212,180,90,.6);color:#d4b45a}

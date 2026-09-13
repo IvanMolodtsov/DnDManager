@@ -1,0 +1,75 @@
+<div id="sheet-stats">
+<section class="card mb-6">
+  <h2 class="font-display text-xl text-gold">{{ t "character.abilities" }}</h2>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "character.abilities.note" }}</p>
+  <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+    {{range .Saves}}
+      <div class="ability-box">
+        <span>{{ t (printf "ability.%s" .Ability) }}</span>
+        <strong>{{.Score}}</strong>
+        <em>{{modFmt .Score}}</em>
+        <hr class="ability-divider">
+        <div class="ability-save">
+          <span>{{ t "character.saves.short" }} {{bonusFmt .Bonus}}</span>
+          {{if $.IsOwner}}
+            <form hx-post="/characters/{{$.Character.ID}}/saves/{{.Ability}}" hx-target="#sheet-stats" hx-swap="outerHTML">
+              <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+              <input type="hidden" name="proficient" value="{{if .Proficient}}0{{else}}1{{end}}">
+              <button class="text-xs {{if .Proficient}}text-gold{{else}}text-parchment/45{{end}}" type="submit">{{ t "character.proficient.short" }}</button>
+            </form>
+            <button class="ability-save-btn" type="button"
+                    hx-get="/characters/{{$.Character.ID}}/checks/save/{{.Ability}}"
+                    hx-target="#spell-use-body" hx-swap="innerHTML">{{ t "character.check.save" }}</button>
+          {{else if .Proficient}}
+            <em>{{ t "character.proficient.short" }}</em>
+          {{end}}
+        </div>
+      </div>
+    {{end}}
+  </div>
+</section>
+
+<section class="card mb-6">
+  <h2 class="font-display text-xl text-gold">{{ t "character.skills" }}</h2>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "character.skills.note" }}</p>
+  <ul class="skill-list mt-3">
+    {{range .Skills}}
+      <li class="skill-row">
+        <div class="skill-name">
+          {{if .SourceURL}}
+            <a href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Name}}</a>
+          {{else}}
+            {{.Name}}
+          {{end}}
+          <span>{{.Ability}}</span>
+        </div>
+        <strong>{{bonusFmt .Bonus}}</strong>
+        {{if $.IsOwner}}
+          <div class="skill-actions">
+            <form hx-post="/characters/{{$.Character.ID}}/skills/{{.Slug}}" hx-target="#sheet-stats" hx-swap="outerHTML">
+              <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+              <input type="hidden" name="proficient" value="{{if .Proficient}}0{{else}}1{{end}}">
+              <input type="hidden" name="expertise" value="{{if .Proficient}}0{{else}}{{if .Expertise}}1{{else}}0{{end}}{{end}}">
+              <button class="{{if .Proficient}}on{{end}}" type="submit" title="{{ t "character.proficient.short" }}">P</button>
+            </form>
+            <form hx-post="/characters/{{$.Character.ID}}/skills/{{.Slug}}" hx-target="#sheet-stats" hx-swap="outerHTML">
+              <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+              <input type="hidden" name="proficient" value="1">
+              <input type="hidden" name="expertise" value="{{if .Expertise}}0{{else}}1{{end}}">
+              <button class="{{if .Expertise}}on{{end}}" type="submit" title="{{ t "character.expertise.short" }}">E</button>
+            </form>
+            <button type="button" title="{{ t "character.check.skill" }}"
+                    hx-get="/characters/{{$.Character.ID}}/checks/skill/{{.Slug}}"
+                    hx-target="#spell-use-body" hx-swap="innerHTML">✓</button>
+          </div>
+        {{else}}
+          <div class="skill-actions">
+            {{if .Proficient}}<span class="on">P</span>{{end}}
+            {{if .Expertise}}<span class="on">E</span>{{end}}
+          </div>
+        {{end}}
+      </li>
+    {{end}}
+  </ul>
+</section>
+</div>

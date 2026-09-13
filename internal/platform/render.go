@@ -42,10 +42,11 @@ func (v BaseView) IsAdmin() bool  { return v.User != nil && v.User.IsAdmin() }
 // NewRenderer parses all *.html files under templatesDir.
 func NewRenderer(templatesDir string, bundle *Bundle) (*Renderer, error) {
 	base := template.New("").Funcs(template.FuncMap{
-		"t":      func(string) string { return "" },
-		"mod":    AbilityMod,
-		"modFmt": FormatMod,
-		"add":    func(a, b int) int { return a + b },
+		"t":        func(string) string { return "" },
+		"mod":      AbilityMod,
+		"modFmt":   FormatMod,
+		"bonusFmt": FormatBonus,
+		"add":      func(a, b int) int { return a + b },
 		"slotLabel": func(n int) string {
 			switch n {
 			case 1:
@@ -113,8 +114,12 @@ func AbilityMod(score int) int {
 
 func FormatMod(score int) string {
 	m := AbilityMod(score)
-	if m >= 0 {
-		return "+" + strconv.Itoa(m)
+	return FormatBonus(m)
+}
+
+func FormatBonus(n int) string {
+	if n >= 0 {
+		return "+" + strconv.Itoa(n)
 	}
-	return strconv.Itoa(m)
+	return strconv.Itoa(n)
 }

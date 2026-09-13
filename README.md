@@ -12,7 +12,7 @@ From the repo root (Go 1.24+):
 go run ./cmd/web
 ```
 
-Windows: `scripts/start.ps1`. Unix: `scripts/start.sh`. Tests: `go test ./...` or `scripts/test.ps1`.
+Windows: `./start.ps1` or `scripts/start.ps1` (Air hot reload — restarts when Go, templates, locales, SQL, or CSS change). One-shot without watch: `scripts/start-once.ps1` or `go run ./cmd/web`. Unix: `./start.sh` / `scripts/start.sh`. Tests: `go test ./...` or `scripts/test.ps1`.
 
 | Env | Default | |
 | --- | --- | --- |
