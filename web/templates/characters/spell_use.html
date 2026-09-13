@@ -15,7 +15,11 @@
 
   <form id="spell-use-form" class="mt-4 space-y-3">
     <input type="hidden" name="csrf_token" value="{{.CSRF}}">
-    {{if gt .Spell.Level 0}}
+    {{if .ItemGrant}}
+      <input type="hidden" name="pool" value="item">
+      <input type="hidden" name="slot_level" value="{{.SlotLevel}}">
+      <p class="text-xs text-parchment/60">{{ t "character.spells.item_at_will" }}</p>
+    {{else if gt .Spell.Level 0}}
       {{if and .HasPact .HasSlots}}
         <fieldset>
           <legend class="text-sm text-parchment/70">{{ t "character.spells.pool" }}</legend>

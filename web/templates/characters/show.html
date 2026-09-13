@@ -55,39 +55,47 @@
 
 {{template "characters/sheet_vitals.html" .}}
 
-<div class="grid gap-4 md:grid-cols-2 mt-6">
-  <section class="slot-card">
-    <h3>{{ t "character.slot.inventory" }}</h3>
-    <p>{{ t "character.slot.later" }}</p>
-  </section>
-  <section class="card">
-    <h3 class="font-display text-gold">{{ t "character.features" }}</h3>
-    {{if .Character.Features}}
-      <ul class="mt-2 space-y-1 text-sm">
-        {{range .Character.Features}}
-          <li>
-            {{if .SourceURL}}
-              <a class="text-gold hover:underline" href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Name}}</a>
-            {{else}}
-              {{.Name}}
-            {{end}}
-          </li>
-        {{end}}
-      </ul>
-    {{else}}
-      <p class="mt-2 text-sm text-parchment/45">{{ t "character.slot.later" }}</p>
-    {{end}}
-  </section>
-</div>
+{{template "characters/sheet_inventory.html" .}}
+
+<dialog id="item-add-modal" class="sheet-dialog item-dialog">
+  <div id="item-add-body"></div>
+</dialog>
+
+<section class="card mt-6">
+  <h3 class="font-display text-gold">{{ t "character.features" }}</h3>
+  {{if .Character.Features}}
+    <ul class="mt-2 space-y-1 text-sm">
+      {{range .Character.Features}}
+        <li>
+          {{if .SourceURL}}
+            <a class="text-gold hover:underline" href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Name}}</a>
+          {{else}}
+            {{.Name}}
+          {{end}}
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="mt-2 text-sm text-parchment/45">{{ t "character.slot.later" }}</p>
+  {{end}}
+</section>
 <script>
   document.body.addEventListener('htmx:afterSwap', function (e) {
     if (e.detail && e.detail.target && e.detail.target.id === 'spell-use-body') {
       var d = document.getElementById('spell-use-modal');
       if (d) d.showModal();
     }
+    if (e.detail && e.detail.target && e.detail.target.id === 'item-add-body') {
+      var d = document.getElementById('item-add-modal');
+      if (d) d.showModal();
+    }
   });
   document.body.addEventListener('close-spell-modal', function () {
     var d = document.getElementById('spell-use-modal');
+    if (d) d.close();
+  });
+  document.body.addEventListener('close-item-modal', function () {
+    var d = document.getElementById('item-add-modal');
     if (d) d.close();
   });
 </script>

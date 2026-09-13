@@ -1,0 +1,249 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{.Item.Name .Lang}}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('item-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-xs text-parchment/60">{{.Item.Kind}}{{$stats := .Item.StatsLine}}{{if $stats}} · {{$stats}}{{end}}</p>
+  {{if and (eq .Mode "magic" "common") .TableURL}}
+    <p class="mt-1 text-sm"><a class="text-gold hover:underline" href="{{.TableURL}}" target="_blank" rel="noopener">{{ t .TableKey }}</a></p>
+  {{else}}
+    {{$src14 := .Item.Source5e14}}
+    {{if $src14}}
+      <p class="mt-1 text-sm"><a class="text-gold hover:underline" href="{{$src14}}" target="_blank" rel="noopener">{{ t "character.item.open_source" }}</a></p>
+    {{end}}
+  {{end}}
+  {{if .Derived.Line}}
+    <p class="mt-2 text-sm text-gold">{{ t "character.item.formula" }}: {{.Derived.Line}}</p>
+  {{end}}
+  {{if .Error}}
+    <p class="mt-3 rounded border border-rose-400/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-100" role="alert">
+      {{ t .Error }}{{if .ConflictName}}: {{.ConflictName}}{{end}}
+    </p>
+  {{end}}
+
+  <form id="item-config-form" class="mt-4 space-y-3"
+        hx-post="/characters/{{.Character.ID}}/items"
+        hx-target="#sheet-inventory" hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <input type="hidden" name="item_id" value="{{.Item.ID}}">
+    <input type="hidden" name="rarity" value="{{.Mode}}">
+    <input type="hidden" name="formula" value="{{.Formula}}">
+    {{if eq .Mode "magic"}}
+      <input type="hidden" name="feat_loaded" value="1">
+    {{end}}
+
+    <label class="block text-sm">
+      <span>{{ t "character.item.qty" }}</span>
+      <input class="input" type="number" name="quantity" min="1" value="{{if .Input.Quantity}}{{.Input.Quantity}}{{else}}1{{end}}">
+    </label>
+
+    {{if or .Item.ChargesMax .Input.ChargesMax}}
+      <div class="grid grid-cols-2 gap-2">
+        <label class="block text-sm">
+          <span>{{ t "character.item.charges" }}</span>
+          <input class="input" type="number" name="charges_current" min="0" value="{{.Input.ChargesCurrent}}">
+        </label>
+        <label class="block text-sm">
+          <span>{{ t "character.item.charges_max" }}</span>
+          <input class="input" type="number" name="charges_max" min="0" value="{{if .Input.ChargesMax}}{{.Input.ChargesMax}}{{else}}{{.Item.ChargesMax}}{{end}}">
+        </label>
+      </div>
+    {{end}}
+
+    {{if ne .Mode "consumable"}}
+      <label class="block text-sm">
+        <span>{{ t "character.item.slot" }}</span>
+        <select class="input" name="slot">
+          <option value="">{{ t "character.item.slot.none" }}</option>
+          {{range $s := .Slots}}
+            {{if $s}}
+              <option value="{{$s}}" {{if or (eq $.Input.EquipSlot $s) (and (eq $.Input.EquipSlot "") (eq $.Suggested $s))}}selected{{end}}>{{ t (printf "character.item.slot.%s" $s) }}</option>
+            {{end}}
+          {{end}}
+        </select>
+      </label>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="equip_now" value="1" {{if .Input.EquipNow}}checked{{end}}>
+        <span>{{ t "character.item.equip_now" }}</span>
+      </label>
+      {{if .Item.RequiresAttunement}}
+        <p class="text-xs text-parchment/50">{{ t "character.item.attune.note" }}</p>
+      {{end}}
+      <label class="block text-sm">
+        <span>{{ t "character.item.custom_name" }}</span>
+        <input class="input" type="text" name="custom_name" value="{{.Input.CustomName}}">
+      </label>
+    {{end}}
+
+    <label class="block text-sm">
+      <span>{{ t "character.item.notes" }}</span>
+      <textarea class="input" name="notes" rows="2">{{.Input.Notes}}</textarea>
+    </label>
+
+    {{if eq .Mode "common"}}
+      <label class="block text-sm">
+        <span>{{ t .PlusNKey }}</span>
+        <input class="input" type="number" name="plus_n" min="0" max="9" value="{{.Input.PlusN}}">
+      </label>
+      <p class="text-xs text-parchment/50">{{ t .PlusNNote }}</p>
+    {{end}}
+
+    {{if .Versatile}}
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="two_handed" value="1" {{if .Input.TwoHanded}}checked{{end}}>
+        <span>{{ t "character.item.two_handed" }}</span>
+      </label>
+    {{end}}
+
+    {{if eq .Mode "magic"}}
+    <div class="feat-block">
+      <h3 class="font-display text-gold">{{ t "character.item.features" }}</h3>
+      <p class="mt-1 text-xs text-parchment/50">{{ t "character.item.features.note" }}</p>
+      <div id="item-features" class="feat-list mt-2">
+        {{range $i, $f := .Features}}
+          <div class="feat-row">
+            <input type="hidden" name="feat.{{$i}}.origin" value="{{$f.Origin}}">
+            <input type="hidden" name="feat.{{$i}}.stat" value="{{$f.Stat}}">
+            <input type="hidden" name="feat.{{$i}}.catalog_kind" value="{{$f.CatalogKind}}">
+            <input type="hidden" name="feat.{{$i}}.catalog_id" value="{{$f.CatalogID}}">
+            <input type="hidden" name="feat.{{$i}}.catalog_slug" value="{{$f.CatalogSlug}}">
+            <input type="hidden" name="feat.{{$i}}.source_url" value="{{$f.SourceURL}}">
+            {{if eq $.Lang "ru"}}
+              <input type="hidden" name="feat.{{$i}}.name_en" value="{{$f.NameEN}}">
+            {{else}}
+              <input type="hidden" name="feat.{{$i}}.name_ru" value="{{$f.NameRU}}">
+            {{end}}
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <label class="block text-sm feat-name">
+                <span>{{ t "character.item.features.name" }}</span>
+                {{if eq $.Lang "ru"}}
+                  <input class="input" type="text" name="feat.{{$i}}.name_ru" value="{{$f.NameRU}}">
+                {{else}}
+                  <input class="input" type="text" name="feat.{{$i}}.name_en" value="{{$f.NameEN}}">
+                {{end}}
+              </label>
+              <button class="btn-ghost" type="button"
+                      hx-post="/characters/{{$.Character.ID}}/items/{{$.Item.ID}}/configure"
+                      hx-target="#item-add-body" hx-swap="innerHTML"
+                      hx-include="#item-config-form"
+                      hx-vals='{"feat_remove":"{{$i}}"}'>{{ t "common.remove" }}</button>
+            </div>
+            <p class="mt-1 text-xs text-parchment/45">
+              {{ t (printf "character.item.features.origin.%s" $f.Origin) }}
+              {{if $f.SourceURL}} · <a class="text-gold hover:underline" href="{{$f.SourceURL}}" target="_blank" rel="noopener">{{ t "character.item.open_source" }}</a>{{end}}
+              · {{$f.Stat}}
+            </p>
+            <label class="block text-sm mt-2">
+              <span>{{ t "character.item.features.value" }}</span>
+              {{$p := $f.Picker}}
+              {{if eq $p "skill"}}
+                <select class="input" name="feat.{{$i}}.value">
+                  {{range $.Skills}}
+                    <option value="{{.Slug}}" {{if eq .Slug $f.Value}}selected{{end}}>{{.Name $.Lang}}</option>
+                  {{end}}
+                </select>
+              {{else if eq $p "damage"}}
+                <select class="input" name="feat.{{$i}}.value">
+                  {{range $.DamageTypes}}
+                    <option value="{{.Slug}}" {{if eq .Slug $f.Value}}selected{{end}}>{{.Name $.Lang}}</option>
+                  {{end}}
+                </select>
+              {{else if eq $p "condition"}}
+                <select class="input" name="feat.{{$i}}.value">
+                  {{range $.Conditions}}
+                    <option value="{{.Slug}}" {{if eq .Slug $f.Value}}selected{{end}}>{{.Name $.Lang}}</option>
+                  {{end}}
+                </select>
+              {{else if eq $p "spell"}}
+                <select class="input" name="feat.{{$i}}.value">
+                  <option value="">{{ t "character.item.features.spell.choose" }}</option>
+                  {{range $.Spells}}
+                    {{if eq .Level $f.GrantLevel}}
+                      <option value="{{.ID}}" {{if eq .ID $f.SpellID}}selected{{end}}>{{.Name $.Lang}}</option>
+                    {{end}}
+                  {{end}}
+                </select>
+              {{else if eq $p "ability"}}
+                <div class="grid grid-cols-2 gap-2">
+                  <select class="input" name="feat.{{$i}}.ability">
+                    {{range $.Abilities}}
+                      <option value="{{.}}" {{if eq . $f.AbilityKey}}selected{{end}}>{{ t (printf "ability.%s" .) }}</option>
+                    {{end}}
+                  </select>
+                  <input class="input" type="number" name="feat.{{$i}}.delta" value="{{$f.AbilityDelta}}">
+                </div>
+              {{else if $f.Multiline}}
+                <textarea class="input" name="feat.{{$i}}.value" rows="2">{{$f.Value}}</textarea>
+              {{else}}
+                <input class="input" type="{{$f.ValueInputType}}" name="feat.{{$i}}.value" value="{{$f.Value}}">
+              {{end}}
+            </label>
+          </div>
+        {{end}}
+      </div>
+      <button class="btn-ghost mt-2" type="button"
+              hx-post="/characters/{{.Character.ID}}/items/{{.Item.ID}}/configure"
+              hx-target="#item-add-body" hx-swap="innerHTML"
+              hx-include="#item-config-form"
+              hx-vals='{"feat_add_blank":"1"}'>{{ t "character.item.features.add_blank" }}</button>
+    </div>
+
+    <div class="mt-3">
+      <label class="block text-sm">
+        <span>{{ t "character.item.features.search" }}</span>
+        <input id="feature-search-q" class="input" type="search" name="q" value="{{.FeatureQuery}}"
+               placeholder="{{ t "character.item.features.search.ph" }}"
+               hx-get="/characters/{{.Character.ID}}/items/{{.Item.ID}}/features/search"
+               hx-trigger="keyup changed delay:300ms, search"
+               hx-target="#feature-search-results" hx-swap="innerHTML"
+               hx-params="q"
+               autocomplete="off"
+               onkeydown="if(event.key==='Enter') event.preventDefault()">
+      </label>
+      <div id="feature-search-results">
+        {{template "characters/feature_search_results.html" .}}
+      </div>
+      <div class="mt-2 flex flex-wrap gap-2 items-end">
+        <label class="block text-sm flex-1">
+          <span>{{ t "character.item.features.url" }}</span>
+          <input class="input" type="url" name="feature_url" placeholder="{{ t "character.item.features.url.ph" }}">
+        </label>
+        <button class="btn-ghost" type="button"
+                hx-post="/characters/{{.Character.ID}}/items/{{.Item.ID}}/configure"
+                hx-target="#item-add-body" hx-swap="innerHTML"
+                hx-include="#item-config-form"
+                hx-vals='{"feat_add_url":"1"}'>{{ t "character.item.features.add" }}</button>
+      </div>
+    </div>
+    {{end}}
+
+    <div class="flex flex-wrap gap-2">
+      {{if eq .Mode "magic" "common"}}
+        <button class="btn-ghost" type="button"
+                hx-get="/characters/{{.Character.ID}}/items/{{.Item.ID}}/rarity"
+                hx-target="#item-add-body" hx-swap="innerHTML">{{ t "common.back" }}</button>
+      {{else}}
+        <button class="btn-ghost" type="button"
+                hx-get="/characters/{{.Character.ID}}/items/{{.Item.ID}}/preview"
+                hx-target="#item-add-body" hx-swap="innerHTML">{{ t "common.back" }}</button>
+      {{end}}
+      {{if and .Formula (eq .Mode "magic")}}
+        <button class="btn-ghost" type="button"
+                hx-post="/characters/{{.Character.ID}}/items/{{.Item.ID}}/roll"
+                hx-target="#item-add-body" hx-swap="innerHTML"
+                hx-include="#item-config-form">
+          {{ t "character.spells.autocalc" }}
+        </button>
+      {{end}}
+      <button class="btn-gold" type="submit">{{ t "character.inventory.add" }}</button>
+    </div>
+  </form>
+
+  {{if .Roll}}
+    <div class="mt-4 rounded border border-gold/30 px-3 py-2">
+      <p class="text-xs text-parchment/60">{{ t "character.spells.roll" }}</p>
+      <p class="font-display text-2xl text-gold">{{.Roll.Total}}</p>
+      <p class="text-xs text-parchment/60">{{range $i, $p := .Roll.Parts}}{{if $i}} · {{end}}{{$p}}{{end}}</p>
+    </div>
+  {{end}}
+</div>

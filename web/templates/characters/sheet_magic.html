@@ -53,12 +53,13 @@
             <p class="text-xs text-parchment/60">
               {{if eq .Spell.Level 0}}{{ t "character.spells.cantrip" }}{{else}}{{ t "character.spells.level" }} {{.Spell.Level}}{{end}}
               {{if .Stats}} · {{.Stats}}{{end}}
+              {{if .FromItem}} · {{ t "character.spells.from_item" }} {{.FromItem}}{{end}}
             </p>
           </div>
           {{if $.IsOwner}}
             <button class="btn-gold" type="button"
                     {{if not .CanUse}}disabled{{end}}
-                    hx-get="/characters/{{$.Character.ID}}/spells/{{.Spell.ID}}/use"
+                    hx-get="/characters/{{$.Character.ID}}/spells/{{.Spell.ID}}/use{{if .ItemKind}}?pool=item{{end}}"
                     hx-target="#spell-use-body" hx-swap="innerHTML"
                     hx-on::after-request="document.getElementById('spell-use-modal').showModal()">
               {{ t "common.use" }}
@@ -78,10 +79,11 @@
   {{if .IsOwner}}
     <label class="block mt-3 text-sm">
       <span>{{ t "character.spells.search" }}</span>
-      <input class="input" type="search" name="q" placeholder="{{ t "character.spells.search.ph" }}"
+      <input id="spell-search-q" class="input" type="search" name="q" placeholder="{{ t "character.spells.search.ph" }}"
              hx-get="/characters/{{.Character.ID}}/spells/search"
-             hx-trigger="input changed delay:300ms, search"
-             hx-target="#spell-search-results" hx-swap="innerHTML">
+             hx-trigger="keyup changed delay:300ms, search"
+             hx-target="#spell-search-results" hx-swap="innerHTML"
+             autocomplete="off">
     </label>
     <div id="spell-search-results" class="mt-2"></div>
   {{end}}

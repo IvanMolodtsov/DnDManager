@@ -1,0 +1,24 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "character.inventory.type.consumable" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('item-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "character.inventory.search.note" }}</p>
+  <label class="block mt-3 text-sm">
+    <span>{{ t "character.inventory.search" }}</span>
+    <input id="item-search-q" class="input" type="search" name="q" value="{{.Query}}" placeholder="{{ t "character.inventory.search.ph" }}"
+           hx-get="/characters/{{.Character.ID}}/items/search"
+           hx-trigger="keyup changed delay:300ms, search"
+           hx-target="#item-search-results" hx-swap="innerHTML"
+           autocomplete="off"
+           autofocus>
+  </label>
+  <div id="item-search-results">
+    {{template "characters/item_search_results.html" .}}
+  </div>
+  <div class="mt-4">
+    <button class="btn-ghost" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/new"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "common.back" }}</button>
+  </div>
+</div>

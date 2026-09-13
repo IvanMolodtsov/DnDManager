@@ -1,0 +1,8 @@
+{{template "characters/sheet_inventory.html" .}}
+{{template "characters/sheet_vitals.html" .}}
+{{if .OOBCombat}}
+{{template "characters/sheet_skills.html" .}}
+<div id="sheet-magic" hx-swap-oob="true" hx-on:close-spell-modal="document.getElementById('spell-use-modal').close()">
+  {{template "characters/sheet_magic.html" .}}
+</div>
+{{end}}

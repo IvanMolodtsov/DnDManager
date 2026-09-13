@@ -1,0 +1,27 @@
+{{if .FeatureHits}}
+  <ul class="spell-list mt-2">
+    {{range .FeatureHits}}
+      <li class="spell-row">
+        <div>
+          <span class="text-gold">{{.Name}}</span>
+          <p class="text-xs text-parchment/60">{{.Kind}}{{if .Sub}} · {{.Sub}}{{end}}</p>
+        </div>
+        <button class="btn-gold" type="button"
+                hx-post="/characters/{{$.Character.ID}}/items/{{$.Item.ID}}/configure"
+                hx-target="#item-add-body" hx-swap="innerHTML"
+                hx-include="#item-config-form"
+                {{if eq .Kind "spell"}}
+                  hx-vals='{"feat_add_spell":"{{.ID}}"}'
+                {{else if eq .Kind "stat"}}
+                  hx-vals='{"feat_add_stat":"{{.ID}}"}'
+                {{else}}
+                  hx-vals='{"feat_add_item":"{{.ID}}"}'
+                {{end}}>
+          {{ t "character.item.features.add" }}
+        </button>
+      </li>
+    {{end}}
+  </ul>
+{{else if .FeatureQuery}}
+  <p class="mt-2 text-sm text-parchment/45">{{ t "character.item.features.search.empty" }}</p>
+{{end}}
