@@ -39,7 +39,8 @@ func (r *Repository) ListByCampaign(campaignID int64) ([]Character, error) {
 const characterSelect = `
 		SELECT ch.id, ch.name, ch.owner_id, u.username, ch.campaign_id, c.name, ch.level,
 		       ch.str, ch.dex, ch.con, ch.intel, ch.wis, ch.cha, ch.created_at,
-		       ch.race_id, ch.background_id, ch.hp_max, ch.hp_current, ch.proficiency_bonus
+		       ch.race_id, ch.background_id, ch.hp_max, ch.hp_current, ch.hp_temp,
+		       ch.death_success, ch.death_fail, ch.proficiency_bonus
 		FROM characters ch
 		JOIN users u ON u.id = ch.owner_id
 		JOIN campaigns c ON c.id = ch.campaign_id`
@@ -248,7 +249,7 @@ func scanCharacterRow(row scanner) (*Character, error) {
 	if err := row.Scan(
 		&ch.ID, &ch.Name, &ch.OwnerID, &ch.OwnerName, &ch.CampaignID, &ch.Campaign, &ch.Level,
 		&ch.STR, &ch.DEX, &ch.CON, &ch.INT, &ch.WIS, &ch.CHA, &created,
-		&raceID, &bgID, &ch.HPMax, &ch.HPCurrent, &ch.ProficiencyBonus,
+		&raceID, &bgID, &ch.HPMax, &ch.HPCurrent, &ch.HPTemp, &ch.DeathSuccess, &ch.DeathFail, &ch.ProficiencyBonus,
 	); err != nil {
 		return nil, err
 	}
@@ -437,5 +438,67 @@ func (r *Repository) UpsertSave(characterID int64, ability string, proficient bo
 		VALUES (?, ?, ?)
 		ON CONFLICT(character_id, ability) DO UPDATE SET proficient = excluded.proficient`,
 		characterID, ability, boolInt(proficient))
+	return err
+}
+
+func (r *Repository) UpdateVitals(characterID int64, hpCurrent, hpTemp, deathSuccess, deathFail int) error {
+	_, err := r.DB.Exec(`
+		UPDATE characters SET hp_current = ?, hp_temp = ?, death_success = ?, death_fail = ?
+		WHERE id = ?`, hpCurrent, hpTemp, deathSuccess, deathFail, characterID)
+	return err
+}
+
+func (r *Repository) ListEffects(characterID int64) ([]rules.Effect, error) {
+	rows, err := r.DB.Query(`
+		SELECT id, slug, kind, name_en, name_ru, source_spell_id, source, duration_key, formula_en, formula_ru,
+		       ac_bonus, ac_base, ac_floor, speed_bonus, speed_mult, temp_hp, tags
+		FROM character_effects WHERE character_id = ? ORDER BY id`, characterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []rules.Effect
+	for rows.Next() {
+		var e rules.Effect
+		var spellID sql.NullInt64
+		if err := rows.Scan(&e.ID, &e.Slug, &e.Kind, &e.NameEN, &e.NameRU, &spellID,
+			&e.Source, &e.DurationKey, &e.FormulaEN, &e.FormulaRU,
+			&e.ACBonus, &e.ACBase, &e.ACFloor, &e.SpeedBonus, &e.SpeedMult, &e.TempHP, &e.Tags); err != nil {
+			return nil, err
+		}
+		e.SourceSpellID = spellID.Int64
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) UpsertEffect(characterID int64, e rules.Effect) error {
+	_, err := r.DB.Exec(`
+		INSERT INTO character_effects (
+			character_id, slug, kind, name_en, name_ru, source_spell_id, source, duration_key, formula_en, formula_ru,
+			ac_bonus, ac_base, ac_floor, speed_bonus, speed_mult, temp_hp, tags
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(character_id, slug) DO UPDATE SET
+			kind = excluded.kind, name_en = excluded.name_en, name_ru = excluded.name_ru,
+			source_spell_id = excluded.source_spell_id, source = excluded.source,
+			duration_key = excluded.duration_key, formula_en = excluded.formula_en, formula_ru = excluded.formula_ru,
+			ac_bonus = excluded.ac_bonus, ac_base = excluded.ac_base, ac_floor = excluded.ac_floor,
+			speed_bonus = excluded.speed_bonus, speed_mult = excluded.speed_mult,
+			temp_hp = excluded.temp_hp, tags = excluded.tags`,
+		characterID, e.Slug, e.Kind, e.NameEN, e.NameRU, nullIfZero(e.SourceSpellID),
+		nz(e.Source, "spell"), e.DurationKey, e.FormulaEN, e.FormulaRU,
+		e.ACBonus, e.ACBase, e.ACFloor, e.SpeedBonus, e.SpeedMult, e.TempHP, e.Tags)
+	return err
+}
+
+func nz(s, fallback string) string {
+	if s == "" {
+		return fallback
+	}
+	return s
+}
+
+func (r *Repository) DeleteEffect(characterID, effectID int64) error {
+	_, err := r.DB.Exec(`DELETE FROM character_effects WHERE id = ? AND character_id = ?`, effectID, characterID)
 	return err
 }

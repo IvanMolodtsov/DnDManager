@@ -1,0 +1,99 @@
+<section class="card mb-6">
+  <h2 class="font-display text-xl text-gold">{{ t "character.combat" }}</h2>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "character.combat.note" }}</p>
+  <div class="combat-stats mt-4">
+    <div class="ability-box">
+      <span>{{ t "character.slot.hp" }}</span>
+      <strong>{{.Combat.HPCurrent}}</strong>
+      <em>/ {{.Combat.HPMax}}</em>
+      {{if $.IsOwner}}
+        <div class="combat-step">
+          <form hx-post="/characters/{{$.Character.ID}}/combat/hp" hx-target="#sheet-vitals" hx-swap="outerHTML">
+            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+            <input type="hidden" name="delta" value="-1">
+            <button class="ability-save-btn" type="submit">−</button>
+          </form>
+          <form hx-post="/characters/{{$.Character.ID}}/combat/hp" hx-target="#sheet-vitals" hx-swap="outerHTML">
+            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+            <input type="hidden" name="delta" value="1">
+            <button class="ability-save-btn" type="submit">+</button>
+          </form>
+        </div>
+      {{end}}
+    </div>
+    <div class="ability-box">
+      <span>{{ t "character.combat.temphp" }}</span>
+      <strong>{{.Combat.TempHP}}</strong>
+      <em>{{ t "character.combat.temphp.stack" }}</em>
+      {{if $.IsOwner}}
+        <div class="combat-step">
+          <form hx-post="/characters/{{$.Character.ID}}/combat/temp" hx-target="#sheet-vitals" hx-swap="outerHTML">
+            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+            <input type="hidden" name="delta" value="-1">
+            <button class="ability-save-btn" type="submit">−</button>
+          </form>
+          <form hx-post="/characters/{{$.Character.ID}}/combat/temp" hx-target="#sheet-vitals" hx-swap="outerHTML">
+            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+            <input type="hidden" name="delta" value="1">
+            <button class="ability-save-btn" type="submit">+</button>
+          </form>
+        </div>
+      {{end}}
+    </div>
+    <div class="ability-box">
+      <span>{{ t "character.combat.ac" }}</span>
+      <strong>{{.Combat.AC}}</strong>
+      <em>{{ t .Combat.ACNote }}</em>
+    </div>
+    <div class="ability-box">
+      <span>{{ t "character.combat.speed" }}</span>
+      <strong>{{.Combat.Speed}}</strong>
+      <em>{{ t .Combat.SpeedNote }}</em>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <p class="text-xs uppercase tracking-wide text-gold/70">{{ t "character.combat.death" }}</p>
+    <p class="mt-1 text-xs text-parchment/50">{{ t "character.combat.death.note" }}</p>
+    <div class="death-tracks mt-2">
+      <div>
+        <span>{{ t "character.combat.death.success" }}</span>
+        <div class="death-pips">
+          {{range $i, $on := .Combat.SuccessPips}}
+            {{if $.IsOwner}}
+              <form hx-post="/characters/{{$.Character.ID}}/combat/death" hx-target="#sheet-vitals" hx-swap="outerHTML">
+                <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                <input type="hidden" name="track" value="success">
+                <input type="hidden" name="pip" value="{{add $i 1}}">
+                <button class="death-pip {{if $on}}on{{end}}" type="submit" aria-pressed="{{$on}}"></button>
+              </form>
+            {{else}}
+              <span class="death-pip {{if $on}}on{{end}}"></span>
+            {{end}}
+          {{end}}
+        </div>
+      </div>
+      <div>
+        <span>{{ t "character.combat.death.fail" }}</span>
+        <div class="death-pips">
+          {{range $i, $on := .Combat.FailPips}}
+            {{if $.IsOwner}}
+              <form hx-post="/characters/{{$.Character.ID}}/combat/death" hx-target="#sheet-vitals" hx-swap="outerHTML">
+                <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                <input type="hidden" name="track" value="fail">
+                <input type="hidden" name="pip" value="{{add $i 1}}">
+                <button class="death-pip fail {{if $on}}on{{end}}" type="submit" aria-pressed="{{$on}}"></button>
+              </form>
+            {{else}}
+              <span class="death-pip fail {{if $on}}on{{end}}"></span>
+            {{end}}
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="mt-3 text-xs text-parchment/50">{{ t "character.proficiency" }} +{{.Character.ProficiencyBonus}}</p>
+  {{if .DefenseLine}}
+    <p class="mt-2 text-sm text-gold">{{ t "character.combat.grants" }}: {{.DefenseLine}}</p>
+  {{end}}
+</section>

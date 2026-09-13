@@ -53,12 +53,9 @@
   <div id="spell-use-body"></div>
 </dialog>
 
-<div class="grid gap-4 md:grid-cols-3 mt-6">
-  <section class="card">
-    <h3 class="font-display text-gold">{{ t "character.slot.hp" }}</h3>
-    <p class="mt-2 text-2xl text-parchment">{{.Character.HPCurrent}} / {{.Character.HPMax}}</p>
-    <p class="mt-1 text-xs text-parchment/50">{{ t "character.proficiency" }} +{{.Character.ProficiencyBonus}}</p>
-  </section>
+{{template "characters/sheet_vitals.html" .}}
+
+<div class="grid gap-4 md:grid-cols-2 mt-6">
   <section class="slot-card">
     <h3>{{ t "character.slot.inventory" }}</h3>
     <p>{{ t "character.slot.later" }}</p>

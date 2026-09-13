@@ -44,6 +44,10 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("GET /characters/{id}/checks/save/{ability}", auth(http.HandlerFunc(c.saveCheckModal)))
 	mux.Handle("POST /characters/{id}/checks/skill/{slug}/roll", auth(http.HandlerFunc(c.rollSkillCheck)))
 	mux.Handle("POST /characters/{id}/checks/save/{ability}/roll", auth(http.HandlerFunc(c.rollSaveCheck)))
+	mux.Handle("POST /characters/{id}/combat/hp", auth(http.HandlerFunc(c.adjustHP)))
+	mux.Handle("POST /characters/{id}/combat/temp", auth(http.HandlerFunc(c.adjustTempHP)))
+	mux.Handle("POST /characters/{id}/combat/death", auth(http.HandlerFunc(c.toggleDeath)))
+	mux.Handle("POST /characters/{id}/effects/{effectID}/remove", auth(http.HandlerFunc(c.dismissEffect)))
 }
 
 func (c *Controller) base(r *http.Request, title string) platform.BaseView {
@@ -83,6 +87,9 @@ type showView struct {
 	Skills         []SkillRow
 	Saves          []SaveRow
 	Tab            string
+	Combat         rules.CombatStats
+	OOBCombat      bool
+	DefenseLine    string
 }
 
 func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
@@ -125,6 +132,7 @@ func (c *Controller) sheetView(r *http.Request, ch *Character, readonly bool) sh
 		Skills:         skillRows(ch, platform.LangFrom(r.Context())),
 		Saves:          saveRows(ch),
 		Tab:            tab,
+		Combat:         rules.DeriveCombat(ch.CombatInput()),
 	}
 }
 
