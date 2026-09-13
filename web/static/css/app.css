@@ -25,3 +25,17 @@
 .skill-actions button,.skill-actions span{min-width:1.15rem;padding:.05rem .2rem;font-size:.65rem;line-height:1.2;border:1px solid rgba(212,180,90,.22);border-radius:.15rem;color:hsla(41,64%,87%,.4);background:transparent}
 .skill-actions button.on,.skill-actions span.on{color:#d4b45a;border-color:rgba(212,180,90,.55)}
 .skill-actions button:hover{border-color:rgba(212,180,90,.6);color:#d4b45a}
+.combat-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+@media (min-width:640px){.combat-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.combat-step{display:flex;gap:.25rem;margin-top:.35rem}
+.death-tracks{display:flex;flex-wrap:wrap;gap:1.25rem}
+.death-tracks>div>span{display:block;font-size:.7rem;color:hsla(41,64%,87%,.6);margin-bottom:.25rem}
+.death-pips{display:flex;gap:.35rem}
+.death-pip{width:1.1rem;height:1.1rem;border-radius:9999px;border:1px solid rgba(212,180,90,.45);background:transparent;padding:0}
+.death-pip.on{background:rgba(212,180,90,.85);border-color:#d4b45a}
+.death-pip.fail{border-color:rgba(251,113,133,.45)}
+.death-pip.fail.on{background:rgba(251,113,133,.75);border-color:#fb7185}
+.status-table{display:flex;flex-direction:column;gap:.15rem;font-size:.8rem}
+.status-head,.status-row{display:grid;grid-template-columns:minmax(6rem,1.3fr) minmax(7rem,1.4fr) minmax(6rem,1.3fr) minmax(5rem,0.9fr) auto;gap:.5rem;align-items:center}
+.status-head{font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;color:rgba(212,180,90,.7)}
+.status-row{border-top:1px solid rgba(212,180,90,.12);padding:.35rem 0}
