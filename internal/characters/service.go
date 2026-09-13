@@ -344,7 +344,16 @@ func (s *Service) hydrate(ch *Character) error {
 	if err := s.ensureSkills(ch); err != nil {
 		return err
 	}
-	return s.syncResources(ch)
+	if err := s.syncResources(ch); err != nil {
+		return err
+	}
+	effects, err := s.Repo.ListEffects(ch.ID)
+	if err != nil {
+		return err
+	}
+	ch.Effects = effects
+	ch.HPTemp = rules.SumTempHP(effects)
+	return nil
 }
 
 func (s *Service) ensureSkills(ch *Character) error {
@@ -601,7 +610,7 @@ func (s *Service) CastSpell(ch *Character, ownerID, spellID int64, kind string, 
 		return rules.ErrSpellNotPrepared
 	}
 	if ls.Spell.Level == 0 {
-		return nil
+		return s.applyCastCombat(ch, ls.Spell, slotLevel)
 	}
 	if kind == "" {
 		if rules.HasKind(ch.Resources, rules.KindPact) && !rules.HasKind(ch.Resources, rules.KindSlots) {
@@ -618,7 +627,131 @@ func (s *Service) CastSpell(ch *Character, ownerID, spellID int64, kind string, 
 	if slotLevel < ls.Spell.Level && kind == rules.KindSlots {
 		slotLevel = ls.Spell.Level
 	}
-	return s.SpendResource(ch, ownerID, kind, slotLevel, amount)
+	if err := s.SpendResource(ch, ownerID, kind, slotLevel, amount); err != nil {
+		return err
+	}
+	return s.applyCastCombat(ch, ls.Spell, slotLevel)
+}
+
+func (s *Service) applyCastCombat(ch *Character, sp catalog.Spell, slotLevel int) error {
+	formula, _, _ := sp.FormulaAt(slotLevel, ch.Level)
+	temp := rules.ParseFlatAmount(formula)
+	e, ok := rules.SpellCombatEffect(sp.Slug, sp.NameEN, sp.NameRU, sp.ID, temp)
+	if !ok {
+		return nil
+	}
+	if err := s.Repo.UpsertEffect(ch.ID, e); err != nil {
+		return err
+	}
+	return s.syncTempFromEffects(ch)
+}
+
+func (s *Service) syncTempFromEffects(ch *Character) error {
+	list, err := s.Repo.ListEffects(ch.ID)
+	if err != nil {
+		return err
+	}
+	ch.Effects = list
+	ch.HPTemp = rules.SumTempHP(list)
+	return s.saveVitals(ch)
+}
+
+func (s *Service) replaceEffects(ch *Character, next []rules.Effect) error {
+	cur, err := s.Repo.ListEffects(ch.ID)
+	if err != nil {
+		return err
+	}
+	keep := map[string]bool{}
+	for _, e := range next {
+		keep[e.Slug] = true
+		if err := s.Repo.UpsertEffect(ch.ID, e); err != nil {
+			return err
+		}
+	}
+	for _, e := range cur {
+		if keep[e.Slug] {
+			continue
+		}
+		if err := s.Repo.DeleteEffect(ch.ID, e.ID); err != nil {
+			return err
+		}
+	}
+	return s.syncTempFromEffects(ch)
+}
+
+func (s *Service) saveVitals(ch *Character) error {
+	ch.HPCurrent = rules.ClampHP(ch.HPCurrent, ch.HPMax)
+	ch.HPTemp = rules.ClampTempHP(ch.HPTemp)
+	if ch.DeathSuccess < 0 {
+		ch.DeathSuccess = 0
+	}
+	if ch.DeathSuccess > 3 {
+		ch.DeathSuccess = 3
+	}
+	if ch.DeathFail < 0 {
+		ch.DeathFail = 0
+	}
+	if ch.DeathFail > 3 {
+		ch.DeathFail = 3
+	}
+	if ch.HPCurrent > 0 {
+		ch.DeathSuccess, ch.DeathFail = 0, 0
+	}
+	return s.Repo.UpdateVitals(ch.ID, ch.HPCurrent, ch.HPTemp, ch.DeathSuccess, ch.DeathFail)
+}
+
+func (s *Service) AdjustHP(ch *Character, ownerID int64, delta int) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	ch.HPCurrent = rules.ClampHP(ch.HPCurrent+delta, ch.HPMax)
+	return s.saveVitals(ch)
+}
+
+func (s *Service) AdjustTempHP(ch *Character, ownerID int64, delta int) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	list := append([]rules.Effect{}, ch.Effects...)
+	if delta > 0 {
+		found := false
+		for i := range list {
+			if list[i].Slug != rules.OtherTempSlug {
+				continue
+			}
+			list[i].TempHP += delta
+			list[i].FormulaEN, list[i].FormulaRU = rules.EffectFormula(list[i])
+			found = true
+			break
+		}
+		if !found {
+			list = append(list, rules.OtherTempEffect(delta))
+		}
+		return s.replaceEffects(ch, list)
+	}
+	return s.replaceEffects(ch, rules.ReduceStackedTemp(list, -delta))
+}
+
+func (s *Service) ToggleDeath(ch *Character, ownerID int64, fail bool, pip int) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	if fail {
+		ch.DeathFail = rules.ToggleDeathPip(ch.DeathFail, pip)
+	} else {
+		ch.DeathSuccess = rules.ToggleDeathPip(ch.DeathSuccess, pip)
+	}
+	return s.Repo.UpdateVitals(ch.ID, ch.HPCurrent, ch.HPTemp, ch.DeathSuccess, ch.DeathFail)
+}
+
+func (s *Service) DismissEffect(ch *Character, ownerID, effectID int64) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	if err := s.Repo.DeleteEffect(ch.ID, effectID); err != nil {
+		return err
+	}
+	return s.syncTempFromEffects(ch)
 }
 
 func (s *Service) RollSpell(ch *Character, spellID int64, slotLevel int) (rules.RollResult, catalog.Spell, error) {

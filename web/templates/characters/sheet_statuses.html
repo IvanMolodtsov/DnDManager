@@ -1,0 +1,33 @@
+<section class="card mb-6">
+  <h2 class="font-display text-xl text-gold">{{ t "character.status" }}</h2>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "character.status.note" }}</p>
+  {{if .Combat.Effects}}
+    <div class="status-table mt-3">
+      <div class="status-head">
+        <span>{{ t "character.status.effect" }}</span>
+        <span>{{ t "character.status.formula" }}</span>
+        <span>{{ t "character.status.duration" }}</span>
+        <span>{{ t "character.status.source" }}</span>
+        <span></span>
+      </div>
+      {{range .Combat.Effects}}
+        <div class="status-row">
+          <span>{{.Name $.Lang}}</span>
+          <span class="font-mono text-gold">{{.Formula $.Lang}}</span>
+          <span>{{if .DurationKey}}{{ t .DurationKey }}{{else}}—{{end}}</span>
+          <span>{{ t (printf "character.status.source.%s" .Source) }}</span>
+          <span>
+            {{if $.IsOwner}}
+              <form hx-post="/characters/{{$.Character.ID}}/effects/{{.ID}}/remove" hx-target="#sheet-vitals" hx-swap="outerHTML">
+                <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                <button class="btn-ghost" type="submit">{{ t "common.remove" }}</button>
+              </form>
+            {{end}}
+          </span>
+        </div>
+      {{end}}
+    </div>
+  {{else}}
+    <p class="mt-3 text-sm text-parchment/45">{{ t "character.status.empty" }}</p>
+  {{end}}
+</section>

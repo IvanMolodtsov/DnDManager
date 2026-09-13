@@ -199,7 +199,7 @@ func (c *Controller) castSpell(w http.ResponseWriter, r *http.Request) {
 	ch, _ = c.Svc.Get(ch.ID)
 	c.Svc.Localize(ch, platform.LangFrom(r.Context()))
 	w.Header().Set("HX-Trigger", "close-spell-modal")
-	c.renderMagic(w, r, ch, false)
+	c.renderMagicCast(w, r, ch, false)
 }
 
 func (c *Controller) spendResource(w http.ResponseWriter, r *http.Request) {

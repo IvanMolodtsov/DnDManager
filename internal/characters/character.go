@@ -30,7 +30,11 @@ type Character struct {
 	BackgroundID     int64
 	HPMax            int
 	HPCurrent        int
+	HPTemp           int
+	DeathSuccess     int
+	DeathFail        int
 	ProficiencyBonus int
+	Effects          []rules.Effect
 	CreatedAt        time.Time
 	Race             *catalog.Race
 	Background       *catalog.Background
@@ -68,6 +72,18 @@ func (c *Character) ClassRules() []rules.ClassLevel {
 
 func (c *Character) Scores() rules.AbilityScores {
 	return rules.AbilityScores{STR: c.STR, DEX: c.DEX, CON: c.CON, INT: c.INT, WIS: c.WIS, CHA: c.CHA}
+}
+
+func (c *Character) CombatInput() rules.CombatInput {
+	speed := 30
+	if c.Race != nil && c.Race.Speed > 0 {
+		speed = c.Race.Speed
+	}
+	return rules.CombatInput{
+		Scores: c.Scores(), Classes: c.ClassRules(), RaceSpeed: speed,
+		HPCurrent: c.HPCurrent, HPMax: c.HPMax, TempHP: c.HPTemp,
+		DeathSuccess: c.DeathSuccess, DeathFail: c.DeathFail, Effects: c.Effects,
+	}
 }
 
 // State is the snapshot the rules engine uses for previews.
