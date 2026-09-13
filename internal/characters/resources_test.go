@@ -166,3 +166,62 @@ func TestMagicMissileRollThroughService(t *testing.T) {
 		t.Fatalf("3d4+3 total %d", res.Total)
 	}
 }
+
+func TestArmorOfAgathysSetsTempHP(t *testing.T) {
+	svc, uid, cid := testSvc(t)
+	ch := insertLeveled(t, svc, uid, cid, "Wiz", 2, 1)
+	var id int64
+	spells, _ := svc.Catalog.ListSpells()
+	for _, s := range spells {
+		if s.Slug == "armor-of-agathys" {
+			id = s.ID
+		}
+	}
+	if id == 0 {
+		t.Fatal("armor-of-agathys missing")
+	}
+	if err := svc.AddLearned(ch, uid, id, true); err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Get(ch.ID)
+	if err := svc.CastSpell(ch, uid, id, rules.KindSlots, 1, 1); err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Get(ch.ID)
+	if ch.HPTemp != 5 {
+		t.Fatalf("temp hp %d", ch.HPTemp)
+	}
+	if len(ch.Effects) != 1 || ch.Effects[0].Slug != "armor-of-agathys" {
+		t.Fatalf("effects %+v", ch.Effects)
+	}
+	st := rules.DeriveCombat(ch.CombatInput())
+	if st.TempHP != 5 {
+		t.Fatalf("combat temp %d", st.TempHP)
+	}
+}
+
+func TestTempHPStacksAcrossSources(t *testing.T) {
+	svc, uid, cid := testSvc(t)
+	ch := insertLeveled(t, svc, uid, cid, "Wiz", 2, 1)
+	ag, _ := rules.SpellCombatEffect("armor-of-agathys", "Armor of Agathys", "Доспех Агатиса", 1, 5)
+	if err := svc.Repo.UpsertEffect(ch.ID, ag); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Repo.UpsertEffect(ch.ID, rules.OtherTempEffect(7)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.Get(ch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.HPTemp != 12 {
+		t.Fatalf("stacked temp %d", got.HPTemp)
+	}
+	if err := svc.DismissEffect(got, uid, got.Effects[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = svc.Get(ch.ID)
+	if rules.SumTempHP(got.Effects) != 7 {
+		t.Fatalf("after dismiss sum %d %+v", rules.SumTempHP(got.Effects), got.Effects)
+	}
+}

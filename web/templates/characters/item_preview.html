@@ -1,0 +1,30 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{.Item.Name .Lang}}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('item-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-sm text-parchment/70">{{.Item.Kind}}{{$stats := .Item.StatsLine}}{{if $stats}} · {{$stats}}{{end}}</p>
+  {{$src14 := .Item.Source5e14}}
+  {{if $src14}}
+    <p class="mt-1 text-sm"><a class="text-gold hover:underline" href="{{$src14}}" target="_blank" rel="noopener">{{ t "character.item.open_source" }}</a></p>
+  {{end}}
+  {{$desc := .Item.Desc .Lang}}
+  {{if $desc}}
+    <div class="item-desc mt-3">{{$desc}}</div>
+    {{if and (eq .Lang "ru") (eq .Item.DescRU "") .Item.DescEN}}
+      <p class="mt-1 text-xs text-parchment/45">{{ t "character.item.desc.en_fallback" }}</p>
+    {{end}}
+  {{else if .Item.IsStub}}
+    <p class="mt-3 text-sm text-parchment/70">{{ t "character.item.stub.note" }}</p>
+  {{else}}
+    <p class="mt-3 text-sm text-parchment/45">{{ t "character.item.no_desc" }}</p>
+  {{end}}
+  <div class="mt-4 flex flex-wrap gap-2">
+    <button class="btn-ghost" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/consumables"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "common.back" }}</button>
+    <button class="btn-gold" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/{{.Item.ID}}/configure"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "common.next" }}</button>
+  </div>
+</div>

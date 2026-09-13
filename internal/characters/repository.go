@@ -2,6 +2,7 @@ package characters
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"dndmanager/internal/rules"
@@ -500,5 +501,180 @@ func nz(s, fallback string) string {
 
 func (r *Repository) DeleteEffect(characterID, effectID int64) error {
 	_, err := r.DB.Exec(`DELETE FROM character_effects WHERE id = ? AND character_id = ?`, effectID, characterID)
+	return err
+}
+
+const characterItemSelect = `
+		SELECT id, catalog_item_id, quantity, equipped_slot, attuned, charges_current, charges_max,
+		       custom_name, notes, atk_bonus, dmg_bonus, extra_damage, ac_bonus, ac_base, ac_floor,
+		       speed_bonus, speed_mult, two_handed
+		FROM character_items`
+
+func (r *Repository) ListCharacterItems(characterID int64) ([]InventoryItem, error) {
+	rows, err := r.DB.Query(characterItemSelect+` WHERE character_id = ? ORDER BY id`, characterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []InventoryItem
+	ids := make([]int64, 0)
+	byID := map[int64]int{}
+	for rows.Next() {
+		it, err := scanInventoryItem(rows)
+		if err != nil {
+			return nil, err
+		}
+		byID[it.ID] = len(out)
+		ids = append(ids, it.ID)
+		out = append(out, it)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	feats, err := r.listItemFeatures(ids)
+	if err != nil {
+		return nil, err
+	}
+	for itemID, list := range feats {
+		i, ok := byID[itemID]
+		if !ok {
+			continue
+		}
+		out[i].Features = list
+		out[i].SyncOverlayFromFeatures()
+	}
+	return out, nil
+}
+
+func (r *Repository) GetCharacterItem(characterID, id int64) (InventoryItem, error) {
+	return scanInventoryItem(r.DB.QueryRow(characterItemSelect+` WHERE character_id = ? AND id = ?`, characterID, id))
+}
+
+func scanInventoryItem(row scanner) (InventoryItem, error) {
+	var it InventoryItem
+	var attune, twoH int
+	err := row.Scan(&it.ID, &it.CatalogID, &it.Quantity, &it.EquippedSlot, &attune, &it.ChargesCurrent, &it.ChargesMax,
+		&it.CustomName, &it.Notes, &it.AtkBonus, &it.DmgBonus, &it.ExtraDamage, &it.ACBonus, &it.ACBase, &it.ACFloor,
+		&it.SpeedBonus, &it.SpeedMult, &twoH)
+	if err != nil {
+		return InventoryItem{}, err
+	}
+	it.Attuned = attune != 0
+	it.TwoHanded = twoH != 0
+	return it, nil
+}
+
+func (r *Repository) InsertCharacterItem(characterID int64, it InventoryItem) (int64, error) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(`
+		INSERT INTO character_items (
+			character_id, catalog_item_id, quantity, equipped_slot, attuned, charges_current, charges_max,
+			custom_name, notes, atk_bonus, dmg_bonus, extra_damage, ac_bonus, ac_base, ac_floor,
+			speed_bonus, speed_mult, two_handed
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		characterID, it.CatalogID, it.Quantity, it.EquippedSlot, boolInt(it.Attuned), it.ChargesCurrent, it.ChargesMax,
+		it.CustomName, it.Notes, it.AtkBonus, it.DmgBonus, it.ExtraDamage, it.ACBonus, it.ACBase, it.ACFloor,
+		it.SpeedBonus, it.SpeedMult, boolInt(it.TwoHanded),
+	)
+	if err != nil {
+		return 0, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	if err := insertItemFeatures(tx, id, it.Features); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+func (r *Repository) UpdateCharacterItem(characterID int64, it InventoryItem) error {
+	_, err := r.DB.Exec(`
+		UPDATE character_items SET
+			quantity = ?, equipped_slot = ?, attuned = ?, charges_current = ?, charges_max = ?,
+			custom_name = ?, notes = ?, atk_bonus = ?, dmg_bonus = ?, extra_damage = ?,
+			ac_bonus = ?, ac_base = ?, ac_floor = ?, speed_bonus = ?, speed_mult = ?, two_handed = ?
+		WHERE id = ? AND character_id = ?`,
+		it.Quantity, it.EquippedSlot, boolInt(it.Attuned), it.ChargesCurrent, it.ChargesMax,
+		it.CustomName, it.Notes, it.AtkBonus, it.DmgBonus, it.ExtraDamage,
+		it.ACBonus, it.ACBase, it.ACFloor, it.SpeedBonus, it.SpeedMult, boolInt(it.TwoHanded),
+		it.ID, characterID,
+	)
+	return err
+}
+
+func (r *Repository) DeleteCharacterItem(characterID, id int64) error {
+	_, err := r.DB.Exec(`DELETE FROM character_items WHERE id = ? AND character_id = ?`, id, characterID)
+	return err
+}
+
+const itemFeatureSelect = `
+		SELECT id, character_item_id, sort_order, name_en, name_ru, stat, value, origin, source_url,
+		       catalog_id, catalog_kind, catalog_slug
+		FROM character_item_features`
+
+func (r *Repository) listItemFeatures(itemIDs []int64) (map[int64][]rules.FeatureDTO, error) {
+	out := map[int64][]rules.FeatureDTO{}
+	if len(itemIDs) == 0 {
+		return out, nil
+	}
+	args := make([]any, len(itemIDs))
+	ph := make([]string, len(itemIDs))
+	for i, id := range itemIDs {
+		args[i] = id
+		ph[i] = "?"
+	}
+	q := itemFeatureSelect + ` WHERE character_item_id IN (` + strings.Join(ph, ",") + `) ORDER BY sort_order, id`
+	rows, err := r.DB.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		f, err := scanItemFeature(rows)
+		if err != nil {
+			return nil, err
+		}
+		out[f.ItemID] = append(out[f.ItemID], f)
+	}
+	return out, rows.Err()
+}
+
+func insertItemFeatures(tx *sql.Tx, itemID int64, feats []rules.FeatureDTO) error {
+	for i, f := range feats {
+		if _, err := tx.Exec(`
+			INSERT INTO character_item_features (
+				character_item_id, sort_order, name_en, name_ru, stat, value, origin, source_url,
+				catalog_id, catalog_kind, catalog_slug
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			itemID, i, f.NameEN, f.NameRU, nz(f.Stat, rules.StatNote), f.Value, nz(f.Origin, rules.OriginCommon), f.SourceURL,
+			f.CatalogID, f.CatalogKind, f.CatalogSlug,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func scanItemFeature(row scanner) (rules.FeatureDTO, error) {
+	var f rules.FeatureDTO
+	err := row.Scan(&f.ID, &f.ItemID, &f.SortOrder, &f.NameEN, &f.NameRU, &f.Stat, &f.Value, &f.Origin, &f.SourceURL,
+		&f.CatalogID, &f.CatalogKind, &f.CatalogSlug)
+	return f, err
+}
+
+func (r *Repository) DeleteTempHPEffects(characterID int64) error {
+	_, err := r.DB.Exec(`
+		DELETE FROM character_effects
+		WHERE character_id = ? AND temp_hp > 0 AND (tags = 'temp_hp' OR tags LIKE 'temp_hp,%' OR tags LIKE '%,temp_hp' OR slug = ?)`,
+		characterID, rules.OtherTempSlug)
 	return err
 }

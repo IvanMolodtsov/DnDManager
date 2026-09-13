@@ -4,6 +4,8 @@
 // link to the parent page when 5e14 has no dedicated URL.
 package catalog
 
+import "strings"
+
 const (
 	KindRace       = "race"
 	KindBackground = "background"
@@ -106,26 +108,177 @@ func (s Subclass) Source(lang string) string {
 func (f Feature) Name(lang string) string   { return Pick(lang, f.NameEN, f.NameRU) }
 func (f Feature) Source(lang string) string { return Pick(lang, f.SourceURL, f.SourceURLRU) }
 
-// Item is mundane or magic gear for a later inventory picker (mechanical fields + source links).
+// StatFeature is a generic one-stat item feature (atk bonus, crit, PHB property, …).
+// Stored in catalog_stat_features — not the class/race table catalog_features.
+type StatFeature struct {
+	ID           int64
+	Slug         string
+	NameEN       string
+	NameRU       string
+	Stat         string
+	DefaultValue string
+	Origin       string
+	SourceURL    string
+	SortOrder    int
+}
+
+func (f StatFeature) Name(lang string) string { return Pick(lang, f.NameEN, f.NameRU) }
+
+// Item is mundane or magic gear (mechanical fields + SRD desc + source links).
 type Item struct {
-	ID          int64
-	Slug        string
-	NameEN      string
-	NameRU      string
-	Kind        string
-	CostGP      float64
-	WeightLB    float64
-	DamageDice  string
-	DamageType  string
-	ArmorClass  string
-	Properties  []string
-	Rarity      string
-	SourceURL   string
-	SourceURLRU string
+	ID                 int64
+	Slug               string
+	NameEN             string
+	NameRU             string
+	Kind               string
+	CostGP             float64
+	WeightLB           float64
+	DamageDice         string
+	DamageType         string
+	ArmorClass         string
+	Properties         []string
+	Rarity             string
+	SourceURL          string
+	SourceURLRU        string
+	DescEN             string
+	DescRU             string
+	ArmorCategory      string
+	ACBase             int
+	DexMax             int
+	StealthDisadv      bool
+	StrMin             int
+	WeaponCategory     string
+	VersatileDice      string
+	RangeNormal        int
+	RangeLong          int
+	SuggestedSlot      string
+	RequiresAttunement bool
+	Consumable         bool
+	ChargesMax         int
+	IsStub             bool
+	IsBase             bool
 }
 
 func (i Item) Name(lang string) string   { return Pick(lang, i.NameEN, i.NameRU) }
 func (i Item) Source(lang string) string { return Pick(lang, i.SourceURL, i.SourceURLRU) }
+
+// Source5e14 is the canonical 5e14 article URL when genitems matched an index card.
+func (i Item) Source5e14() string { return i.SourceURLRU }
+
+func (i Item) Desc(lang string) string { return Pick(lang, i.DescEN, i.DescRU) }
+
+func (i Item) HasProperty(p string) bool {
+	p = strings.ToLower(p)
+	for _, x := range i.Properties {
+		if strings.ToLower(x) == p {
+			return true
+		}
+	}
+	return false
+}
+
+func (i Item) IsMagic() bool {
+	return i.IsStub || i.Rarity != ""
+}
+
+func (i Item) IsShield() bool {
+	return strings.EqualFold(i.ArmorCategory, "shield") || i.HasProperty("shield") || i.SuggestedSlot == "shield"
+}
+
+func (i Item) IsTwoHanded() bool {
+	return i.HasProperty("two-handed")
+}
+
+func (i Item) IsRangedWeapon() bool {
+	if arm, ok := PHBArmBySlug(i.Slug); ok {
+		return arm.Ranged
+	}
+	return i.HasProperty("ammunition")
+}
+
+func (i Item) IsArmor() bool {
+	if i.Kind == "weapon" || i.Kind == "jewelry" || i.Consumable {
+		return false
+	}
+	return i.Kind == "armor" || i.ArmorCategory != "" || i.IsShield()
+}
+
+func (i Item) IsJewelry() bool {
+	return i.Kind == "jewelry"
+}
+
+func (i Item) IsWeaponBase() bool {
+	if !i.IsBase || i.IsArmor() || i.IsJewelry() {
+		return false
+	}
+	return i.Kind == "weapon" || i.WeaponCategory != "" || i.DamageDice != ""
+}
+
+func (i Item) BuilderKind() string {
+	switch {
+	case i.Consumable:
+		return "consumable"
+	case i.IsJewelry():
+		return "jewelry"
+	case i.IsArmor():
+		return "armor"
+	default:
+		return "weapon"
+	}
+}
+
+func (i Item) BuilderListPath() string {
+	switch i.BuilderKind() {
+	case "armor":
+		return "armor"
+	case "jewelry":
+		return "jewelry"
+	default:
+		return "weapons"
+	}
+}
+
+func (i Item) Stackable() bool {
+	if i.IsStub || (i.Rarity != "" && !i.Consumable) {
+		return false
+	}
+	return i.Consumable || i.Rarity == ""
+}
+
+// StatsLine is the catalog subtitle, e.g. "1d8 slashing · versatile 1d10".
+func (i Item) StatsLine() string {
+	var parts []string
+	if i.ArmorClass != "" {
+		parts = append(parts, "AC "+i.ArmorClass)
+	}
+	if i.DamageDice != "" {
+		s := i.DamageDice
+		if i.DamageType != "" {
+			s += " " + i.DamageType
+		}
+		parts = append(parts, s)
+	}
+	if i.VersatileDice != "" {
+		parts = append(parts, "versatile "+i.VersatileDice)
+	}
+	if i.Rarity != "" {
+		parts = append(parts, i.Rarity)
+	}
+	if i.RequiresAttunement {
+		parts = append(parts, "attunement")
+	}
+	if i.IsStub {
+		parts = append(parts, "stub")
+	}
+	out := ""
+	for n, p := range parts {
+		if n > 0 {
+			out += " · "
+		}
+		out += p
+	}
+	return out
+}
 
 // Spell is a later spell-picker row: stats + class list + source links, not lore text.
 type Spell struct {

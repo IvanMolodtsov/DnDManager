@@ -1,0 +1,28 @@
+{{if .Results}}
+  <ul class="spell-list mt-3">
+    {{range .Results}}
+      <li class="spell-row">
+        <div>
+          <span class="text-gold">{{.Name $.Lang}}</span>
+          <p class="text-xs text-parchment/60">
+            {{if eq $.Kind "armor"}}
+              {{$stats := .StatsLine}}{{if $stats}}{{$stats}}{{else}}{{.ArmorCategory}}{{end}}
+            {{else if eq $.Kind "jewelry"}}
+              {{ t (printf "character.item.slot.%s" .SuggestedSlot) }}
+            {{else}}
+              {{$stats := .StatsLine}}{{if $stats}}{{$stats}} · {{end}}{{.WeaponCategory}}
+              {{if .IsRangedWeapon}} · ranged{{else}} · melee{{end}}
+            {{end}}
+          </p>
+        </div>
+        <button class="btn-gold" type="button"
+                hx-get="/characters/{{$.Character.ID}}/items/{{.ID}}/rarity"
+                hx-target="#item-add-body" hx-swap="innerHTML">
+          {{ t "common.next" }}
+        </button>
+      </li>
+    {{end}}
+  </ul>
+{{else if .Query}}
+  <p class="mt-3 text-sm text-parchment/45">{{ t (printf "character.inventory.base.empty.%s" .Kind) }}</p>
+{{end}}

@@ -1,0 +1,37 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{.Item.Name .Lang}}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('item-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="base-meta mt-2">
+    {{$stats := .Item.StatsLine}}{{if $stats}}{{$stats}}{{end}}
+    {{if eq .Kind "weapon"}}
+      {{if $stats}} · {{end}}{{.Item.WeaponCategory}}
+      {{if .Item.IsRangedWeapon}} · ranged{{else}} · melee{{end}}
+    {{else if eq .Kind "armor"}}
+      {{if .Item.ArmorCategory}}{{if $stats}} · {{end}}{{.Item.ArmorCategory}}{{end}}
+    {{else if eq .Kind "jewelry"}}
+      {{ t (printf "character.item.slot.%s" .Item.SuggestedSlot) }}
+    {{end}}
+  </p>
+  {{if .Item.Properties}}
+    <p class="mt-1 text-xs text-parchment/50">{{range $i, $p := .Item.Properties}}{{if $i}}, {{end}}{{$p}}{{end}}</p>
+  {{end}}
+  {{if .TableURL}}
+    <p class="mt-2 text-sm"><a class="text-gold hover:underline" href="{{.TableURL}}" target="_blank" rel="noopener">{{ t .TableKey }}</a></p>
+  {{end}}
+  <p class="mt-3 text-xs text-parchment/50">{{ t (printf "character.inventory.rarity.note.%s" .Kind) }}</p>
+  <div class="type-grid">
+    <button class="btn-gold" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/{{.Item.ID}}/configure?rarity=common"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "character.inventory.rarity.common" }}</button>
+    <button class="btn-gold" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/{{.Item.ID}}/configure?rarity=magic"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "character.inventory.rarity.magic" }}</button>
+  </div>
+  <div class="mt-4">
+    <button class="btn-ghost" type="button"
+            hx-get="/characters/{{.Character.ID}}/items/{{.ListPath}}"
+            hx-target="#item-add-body" hx-swap="innerHTML">{{ t "common.back" }}</button>
+  </div>
+</div>

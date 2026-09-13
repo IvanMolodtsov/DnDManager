@@ -341,10 +341,10 @@ func (s *Service) hydrate(ch *Character) error {
 	if err := s.loadSpells(ch); err != nil {
 		return err
 	}
-	if err := s.ensureSkills(ch); err != nil {
+	if err := s.loadInventory(ch); err != nil {
 		return err
 	}
-	if err := s.syncResources(ch); err != nil {
+	if err := s.ensureSkills(ch); err != nil {
 		return err
 	}
 	effects, err := s.Repo.ListEffects(ch.ID)
@@ -353,7 +353,7 @@ func (s *Service) hydrate(ch *Character) error {
 	}
 	ch.Effects = effects
 	ch.HPTemp = rules.SumTempHP(effects)
-	return nil
+	return s.syncResources(ch)
 }
 
 func (s *Service) ensureSkills(ch *Character) error {
@@ -507,9 +507,439 @@ func ErrorKey(err error) string {
 		return "error.spell.formula"
 	case errors.Is(err, rules.ErrUnknownCheck):
 		return "error.check.unknown"
+	case errors.Is(err, rules.ErrSlotOccupied):
+		return "error.item.slot"
+	case errors.Is(err, rules.ErrSlotRequired):
+		return "error.item.slot_required"
+	case errors.Is(err, rules.ErrAttunementFull):
+		return "error.item.attune"
+	case errors.Is(err, rules.ErrItemNotHeld):
+		return "error.item.missing"
 	default:
 		return "error.generic"
 	}
+}
+
+func (s *Service) loadInventory(ch *Character) error {
+	rows, err := s.Repo.ListCharacterItems(ch.ID)
+	if err != nil {
+		return err
+	}
+	var out []InventoryItem
+	for _, row := range rows {
+		it, err := s.Catalog.Item(row.CatalogID)
+		if err != nil {
+			continue
+		}
+		resolved := s.resolveItem(*it)
+		row.AttachCatalog(resolved)
+		out = append(out, row)
+	}
+	ch.Inventory = out
+	s.loadGrantedSpells(ch)
+	return nil
+}
+
+func (s *Service) loadGrantedSpells(ch *Character) {
+	var out []GrantedSpell
+	seen := map[int64]bool{}
+	for _, it := range ch.Inventory {
+		if !it.Equipped() {
+			continue
+		}
+		g := rules.GrantsFromFeatures(it.Features)
+		for _, id := range g.SpellIDs {
+			if seen[id] {
+				continue
+			}
+			sp, err := s.Catalog.Spell(id)
+			if err != nil {
+				continue
+			}
+			seen[id] = true
+			out = append(out, GrantedSpell{
+				Spell: *sp, ItemID: it.ID,
+				ItemNameEN: it.DisplayName("en"), ItemNameRU: it.DisplayName("ru"),
+			})
+		}
+	}
+	ch.GrantedSpells = out
+}
+
+func (s *Service) held(ch *Character, id int64) (InventoryItem, bool) {
+	return ch.InventoryByID(id)
+}
+
+type AddItemInput struct {
+	CatalogID      int64
+	Quantity       int
+	EquipSlot      string
+	EquipNow       bool
+	Attune         bool
+	ChargesCurrent int
+	ChargesMax     int
+	CustomName     string
+	Notes          string
+	Features       []rules.FeatureDTO
+	PlusN          int
+	AtkBonus       int
+	DmgBonus       int
+	ExtraDamage    string
+	ACBonus        int
+	ACBase         int
+	ACFloor        int
+	SpeedBonus     int
+	SpeedMult      int
+	TwoHanded      bool
+}
+
+func (in AddItemInput) overlayFeatures(cat catalog.Item) []rules.FeatureDTO {
+	var out []rules.FeatureDTO
+	if in.PlusN != 0 {
+		out = append(out, rules.CommonPlusFor(cat, in.PlusN)...)
+	}
+	push := func(stat, value, nameEN, nameRU string) {
+		if value == "" || value == "0" {
+			return
+		}
+		out = append(out, rules.FeatureDTO{
+			NameEN: nameEN, NameRU: nameRU, Stat: stat, Value: value, Origin: rules.OriginCommon,
+		})
+	}
+	if in.AtkBonus != 0 {
+		push(rules.StatAtkBonus, strconv.Itoa(in.AtkBonus), "Attack bonus", "Бонус атаки")
+	}
+	if in.DmgBonus != 0 {
+		push(rules.StatDmgBonus, strconv.Itoa(in.DmgBonus), "Damage bonus", "Бонус урона")
+	}
+	if x := strings.TrimSpace(in.ExtraDamage); x != "" {
+		push(rules.StatExtraDice, x, "Extra dice", "Доп. кости")
+	}
+	if in.ACBonus != 0 {
+		push(rules.StatACBonus, strconv.Itoa(in.ACBonus), "AC bonus", "Бонус КД")
+	}
+	if in.ACBase != 0 {
+		push(rules.StatACBase, strconv.Itoa(in.ACBase), "AC base", "База КД")
+	}
+	if in.ACFloor != 0 {
+		push(rules.StatACFloor, strconv.Itoa(in.ACFloor), "AC floor", "Минимум КД")
+	}
+	if in.SpeedBonus != 0 {
+		push(rules.StatSpeedBonus, strconv.Itoa(in.SpeedBonus), "Speed bonus", "Бонус скорости")
+	}
+	if in.SpeedMult != 0 {
+		push(rules.StatSpeedMult, strconv.Itoa(in.SpeedMult), "Speed ×", "Скорость ×")
+	}
+	return out
+}
+
+func (in AddItemInput) asItem(cat catalog.Item) InventoryItem {
+	qty := in.Quantity
+	if qty < 1 {
+		qty = 1
+	}
+	chargesMax := in.ChargesMax
+	if chargesMax < 0 {
+		chargesMax = 0
+	}
+	if chargesMax == 0 {
+		chargesMax = cat.ChargesMax
+	}
+	cur := in.ChargesCurrent
+	if cur < 0 {
+		cur = 0
+	}
+	if cur == 0 && chargesMax > 0 {
+		cur = chargesMax
+	}
+	if cur > chargesMax {
+		cur = chargesMax
+	}
+	return InventoryItem{
+		CatalogID: cat.ID, Item: cat, Quantity: qty,
+		ChargesCurrent: cur, ChargesMax: chargesMax,
+		CustomName: strings.TrimSpace(in.CustomName), Notes: strings.TrimSpace(in.Notes),
+		TwoHanded: in.TwoHanded, Features: append([]rules.FeatureDTO{}, in.Features...),
+	}
+}
+
+func (s *Service) resolveItem(cat catalog.Item) catalog.Item {
+	if slug := rules.InheritWeaponSlug(cat.Slug); slug != "" {
+		if row, err := s.Catalog.ItemBySlug(slug); err == nil {
+			if cat.DamageDice == "" {
+				cat.DamageDice = row.DamageDice
+				cat.DamageType = row.DamageType
+			}
+			if len(cat.Properties) == 0 {
+				cat.Properties = append([]string{}, row.Properties...)
+			}
+			if cat.WeaponCategory == "" {
+				cat.WeaponCategory = row.WeaponCategory
+			}
+			if cat.VersatileDice == "" {
+				cat.VersatileDice = row.VersatileDice
+			}
+			if cat.RangeNormal == 0 {
+				cat.RangeNormal, cat.RangeLong = row.RangeNormal, row.RangeLong
+			}
+		}
+	}
+	return cat
+}
+
+func (s *Service) catalogFeatures(cat catalog.Item) []rules.FeatureDTO {
+	var inherit *catalog.Item
+	if slug := rules.InheritWeaponSlug(cat.Slug); slug != "" {
+		if row, err := s.Catalog.ItemBySlug(slug); err == nil {
+			inherit = row
+		}
+	}
+	return rules.CatalogItemFeatures(cat, inherit)
+}
+
+func (s *Service) FeaturesFromRef(raw string) []rules.FeatureDTO {
+	raw = strings.TrimSpace(raw)
+	ref, ok := rules.ParseDND14URL(raw)
+	if !ok {
+		return rules.FeaturesFromUnknownURL(raw)
+	}
+	if ref.Type == "spells" {
+		if sp, err := s.Catalog.Spell(ref.ID); err == nil {
+			return []rules.FeatureDTO{rules.FeatureFromSpell(*sp)}
+		}
+		if sp, err := s.Catalog.SpellBySlug(ref.Slug); err == nil {
+			return []rules.FeatureDTO{rules.FeatureFromSpell(*sp)}
+		}
+	} else {
+		if it, err := s.Catalog.Item(ref.ID); err == nil {
+			return rules.FeaturesFromItem(*it)
+		}
+		if it, err := s.Catalog.ItemBySlug(ref.Slug); err == nil {
+			return rules.FeaturesFromItem(*it)
+		}
+	}
+	return rules.FeaturesFromURL(ref)
+}
+
+func (s *Service) AddItem(ch *Character, ownerID int64, in AddItemInput) (InventoryItem, error) {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return InventoryItem{}, err
+	}
+	cat, err := s.Catalog.Item(in.CatalogID)
+	if err != nil {
+		return InventoryItem{}, err
+	}
+	resolved := s.resolveItem(*cat)
+	it := in.asItem(resolved)
+	it.Features = append(append([]rules.FeatureDTO{}, in.Features...), in.overlayFeatures(resolved)...)
+	it.SyncOverlayFromFeatures()
+	it.AttachCatalog(resolved)
+	if in.EquipNow {
+		slot := in.EquipSlot
+		if slot == "" {
+			slot = cat.SuggestedSlot
+		}
+		piece := it.GearPiece()
+		if cat.RequiresAttunement {
+			piece.Attuned = true
+			piece.RequiresAttune = true
+		}
+		if piece.TwoHanded {
+			piece.Slot = rules.SlotMainHand
+		} else if piece.Shield() {
+			piece.Slot = rules.SlotShield
+		} else {
+			piece.Slot = slot
+		}
+		if err := rules.CheckEquip(ch.EquippedGear(), piece); err != nil {
+			return InventoryItem{}, err
+		}
+	}
+	if cat.Stackable() && !it.HasOverlay() && !in.EquipNow {
+		for i := range ch.Inventory {
+			ex := ch.Inventory[i]
+			if ex.CatalogID == cat.ID && !ex.Equipped() && !ex.HasOverlay() && ex.Item.Stackable() {
+				ex.Quantity += it.Quantity
+				if err := s.Repo.UpdateCharacterItem(ch.ID, ex); err != nil {
+					return InventoryItem{}, err
+				}
+				return ex, s.loadInventory(ch)
+			}
+		}
+	}
+	id, err := s.Repo.InsertCharacterItem(ch.ID, it)
+	if err != nil {
+		return InventoryItem{}, err
+	}
+	it.ID = id
+	if err := s.loadInventory(ch); err != nil {
+		return it, err
+	}
+	if in.EquipNow {
+		slot := in.EquipSlot
+		if slot == "" {
+			slot = cat.SuggestedSlot
+		}
+		if err := s.EquipItem(ch, ownerID, id, slot); err != nil {
+			return it, err
+		}
+		got, _ := s.held(ch, id)
+		return got, nil
+	}
+	return it, nil
+}
+
+func (s *Service) RemoveItem(ch *Character, ownerID, invID int64) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	if _, ok := s.held(ch, invID); !ok {
+		return rules.ErrItemNotHeld
+	}
+	return s.Repo.DeleteCharacterItem(ch.ID, invID)
+}
+
+func (s *Service) AdjustItemQty(ch *Character, ownerID, invID int64, delta int) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	it, ok := s.held(ch, invID)
+	if !ok {
+		return rules.ErrItemNotHeld
+	}
+	it.Quantity += delta
+	if it.Quantity < 1 {
+		return s.Repo.DeleteCharacterItem(ch.ID, invID)
+	}
+	return s.Repo.UpdateCharacterItem(ch.ID, it)
+}
+
+func (s *Service) EquipItem(ch *Character, ownerID, invID int64, slot string) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	it, ok := s.held(ch, invID)
+	if !ok {
+		return rules.ErrItemNotHeld
+	}
+	piece := it.GearPiece()
+	if slot == "" {
+		slot = it.Item.SuggestedSlot
+	}
+	occ := rules.OccupiedMap(ch.EquippedGear())
+	norm, ok := rules.NormalizeEquipSlot(slot, it.Item.SuggestedSlot, occ)
+	if !ok {
+		return rules.ErrSlotRequired
+	}
+	if piece.TwoHanded {
+		norm = rules.SlotMainHand
+	}
+	if piece.Shield() {
+		norm = rules.SlotShield
+	}
+	piece.Slot = norm
+	if it.Item.RequiresAttunement {
+		piece.Attuned = true
+		piece.RequiresAttune = true
+	}
+	if err := rules.CheckEquip(ch.EquippedGear(), piece); err != nil {
+		return err
+	}
+	it.EquippedSlot = norm
+	it.Attuned = it.Item.RequiresAttunement
+	if it.TwoHanded || it.Item.IsTwoHanded() {
+		it.TwoHanded = it.TwoHanded || it.Item.IsTwoHanded()
+	}
+	if err := s.Repo.UpdateCharacterItem(ch.ID, it); err != nil {
+		return err
+	}
+	return s.loadInventory(ch)
+}
+
+func (s *Service) UnequipItem(ch *Character, ownerID, invID int64) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	it, ok := s.held(ch, invID)
+	if !ok {
+		return rules.ErrItemNotHeld
+	}
+	it.EquippedSlot = ""
+	it.Attuned = false
+	if err := s.Repo.UpdateCharacterItem(ch.ID, it); err != nil {
+		return err
+	}
+	return s.loadInventory(ch)
+}
+
+func (s *Service) UseItem(ch *Character, ownerID, invID int64) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	it, ok := s.held(ch, invID)
+	if !ok {
+		return rules.ErrItemNotHeld
+	}
+	if err := s.applyConsumable(ch, it); err != nil {
+		return err
+	}
+	it.Quantity--
+	if it.Quantity < 1 {
+		if err := s.Repo.DeleteCharacterItem(ch.ID, it.ID); err != nil {
+			return err
+		}
+	} else if err := s.Repo.UpdateCharacterItem(ch.ID, it); err != nil {
+		return err
+	}
+	if err := s.loadInventory(ch); err != nil {
+		return err
+	}
+	return s.syncTempFromEffects(ch)
+}
+
+func (s *Service) applyConsumable(ch *Character, it InventoryItem) error {
+	nameEN, nameRU := it.Item.NameEN, it.Item.NameRU
+	if it.CustomName != "" {
+		nameEN, nameRU = it.CustomName, it.CustomName
+	}
+	if e, ok := rules.PotionCombatEffect(it.Item.Slug, nameEN, nameRU); ok {
+		if err := s.Repo.UpsertEffect(ch.ID, e); err != nil {
+			return err
+		}
+		return nil
+	}
+	formula := rules.HealingPotionFormula(it.Item.Slug)
+	if formula == "" && it.Item.DamageType == "healing" {
+		formula = it.Item.DamageDice
+	}
+	if formula == "" {
+		return nil
+	}
+	res, err := rules.RollFormula(formula)
+	if err != nil {
+		return err
+	}
+	ch.HPCurrent = rules.ClampHP(ch.HPCurrent+res.Total, ch.HPMax)
+	return s.saveVitals(ch)
+}
+
+func (s *Service) AppendItemNotes(ch *Character, ownerID, invID int64, note string) error {
+	if err := s.RequireOwner(ch, ownerID); err != nil {
+		return err
+	}
+	it, ok := s.held(ch, invID)
+	if !ok {
+		return rules.ErrItemNotHeld
+	}
+	note = strings.TrimSpace(note)
+	if note == "" {
+		return nil
+	}
+	if it.Notes != "" {
+		it.Notes += "\n"
+	}
+	it.Notes += note
+	return s.Repo.UpdateCharacterItem(ch.ID, it)
 }
 
 func (s *Service) loadSpells(ch *Character) error {
@@ -554,6 +984,29 @@ func (s *Service) learned(ch *Character, spellID int64) (LearnedSpell, bool) {
 		}
 	}
 	return LearnedSpell{}, false
+}
+
+func (s *Service) grantedSpell(ch *Character, spellID int64) (GrantedSpell, bool) {
+	for _, g := range ch.GrantedSpells {
+		if g.Spell.ID == spellID {
+			return g, true
+		}
+	}
+	return GrantedSpell{}, false
+}
+
+func (s *Service) spellForUse(ch *Character, spellID int64) (catalog.Spell, bool, bool) {
+	if ls, ok := s.learned(ch, spellID); ok {
+		fromItem := false
+		if _, gok := s.grantedSpell(ch, spellID); gok {
+			fromItem = true
+		}
+		return ls.Spell, ls.Prepared, fromItem
+	}
+	if g, ok := s.grantedSpell(ch, spellID); ok {
+		return g.Spell, true, true
+	}
+	return catalog.Spell{}, false, false
 }
 
 func (s *Service) AddLearned(ch *Character, ownerID, spellID int64, prepared bool) error {
@@ -602,15 +1055,37 @@ func (s *Service) CastSpell(ch *Character, ownerID, spellID int64, kind string, 
 	if err := s.RequireOwner(ch, ownerID); err != nil {
 		return err
 	}
-	ls, ok := s.learned(ch, spellID)
-	if !ok {
+	sp, prepared, fromItem := s.spellForUse(ch, spellID)
+	if sp.ID == 0 {
 		return rules.ErrSpellNotLearned
 	}
-	if !ls.Prepared {
+	if !prepared {
 		return rules.ErrSpellNotPrepared
 	}
-	if ls.Spell.Level == 0 {
-		return s.applyCastCombat(ch, ls.Spell, slotLevel)
+	if kind == rules.KindItem || (fromItem && kind == rules.KindItem) {
+		if !fromItem {
+			return rules.ErrSpellNotLearned
+		}
+		if sp.Level == 0 {
+			return s.applyCastCombat(ch, sp, slotLevel)
+		}
+		if slotLevel < sp.Level {
+			slotLevel = sp.Level
+		}
+		return s.applyCastCombat(ch, sp, slotLevel)
+	}
+	if sp.Level == 0 {
+		return s.applyCastCombat(ch, sp, slotLevel)
+	}
+	ls, learned := s.learned(ch, spellID)
+	if !learned {
+		if fromItem {
+			if slotLevel < sp.Level {
+				slotLevel = sp.Level
+			}
+			return s.applyCastCombat(ch, sp, slotLevel)
+		}
+		return rules.ErrSpellNotLearned
 	}
 	if kind == "" {
 		if rules.HasKind(ch.Resources, rules.KindPact) && !rules.HasKind(ch.Resources, rules.KindSlots) {
@@ -755,22 +1230,22 @@ func (s *Service) DismissEffect(ch *Character, ownerID, effectID int64) error {
 }
 
 func (s *Service) RollSpell(ch *Character, spellID int64, slotLevel int) (rules.RollResult, catalog.Spell, error) {
-	ls, ok := s.learned(ch, spellID)
-	if !ok {
+	sp, _, _ := s.spellForUse(ch, spellID)
+	if sp.ID == 0 {
 		return rules.RollResult{}, catalog.Spell{}, rules.ErrSpellNotLearned
 	}
 	if slotLevel < 1 {
 		if p, ok := rules.PactPool(ch.Resources); ok && !rules.HasKind(ch.Resources, rules.KindSlots) {
 			slotLevel = p.SlotLevel
 		} else {
-			slotLevel = ls.Spell.Level
+			slotLevel = sp.Level
 		}
 	}
-	formula, _, heal := ls.Spell.FormulaAt(slotLevel, ch.Level)
+	formula, _, heal := sp.FormulaAt(slotLevel, ch.Level)
 	expr := formula
 	if expr == "" {
 		expr = heal
 	}
 	res, err := rules.RollFormula(expr)
-	return res, ls.Spell, err
+	return res, sp, err
 }
