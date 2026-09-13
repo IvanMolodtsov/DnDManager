@@ -38,6 +38,12 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("POST /characters/{id}/spells/{spellID}/roll", auth(http.HandlerFunc(c.rollSpell)))
 	mux.Handle("POST /characters/{id}/spells/{spellID}/cast", auth(http.HandlerFunc(c.castSpell)))
 	mux.Handle("POST /characters/{id}/resources/use", auth(http.HandlerFunc(c.spendResource)))
+	mux.Handle("POST /characters/{id}/skills/{slug}", auth(http.HandlerFunc(c.toggleSkill)))
+	mux.Handle("POST /characters/{id}/saves/{ability}", auth(http.HandlerFunc(c.toggleSave)))
+	mux.Handle("GET /characters/{id}/checks/skill/{slug}", auth(http.HandlerFunc(c.skillCheckModal)))
+	mux.Handle("GET /characters/{id}/checks/save/{ability}", auth(http.HandlerFunc(c.saveCheckModal)))
+	mux.Handle("POST /characters/{id}/checks/skill/{slug}/roll", auth(http.HandlerFunc(c.rollSkillCheck)))
+	mux.Handle("POST /characters/{id}/checks/save/{ability}/roll", auth(http.HandlerFunc(c.rollSaveCheck)))
 }
 
 func (c *Controller) base(r *http.Request, title string) platform.BaseView {
@@ -74,6 +80,8 @@ type showView struct {
 	ResourceGroups []ResourceGroup
 	Prepared       []SpellRow
 	Learned        []SpellRow
+	Skills         []SkillRow
+	Saves          []SaveRow
 	Tab            string
 }
 
@@ -114,6 +122,8 @@ func (c *Controller) sheetView(r *http.Request, ch *Character, readonly bool) sh
 		ResourceGroups: resourceGroups(ch.Resources),
 		Prepared:       spellRows(ch, true),
 		Learned:        spellRows(ch, false),
+		Skills:         skillRows(ch, platform.LangFrom(r.Context())),
+		Saves:          saveRows(ch),
 		Tab:            tab,
 	}
 }

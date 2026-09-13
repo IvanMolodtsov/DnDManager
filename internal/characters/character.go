@@ -38,6 +38,8 @@ type Character struct {
 	Features         []rules.FeatureGrant
 	Resources        []rules.Pool
 	Spells           []LearnedSpell
+	SkillMarks       []rules.SkillMark
+	SaveMarks        []rules.SaveMark
 }
 
 // LearnedSpell is a catalog spell on the character (prepared is a subset).
