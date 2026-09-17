@@ -395,3 +395,63 @@ func TestLeatherShieldCatalogAC(t *testing.T) {
 		t.Fatalf("leather+shield ac %d", st.AC)
 	}
 }
+
+func TestEquippedWeaponSheetLineUsesCharacterAttack(t *testing.T) {
+	svc, uid, cid := testSvc(t)
+	ch := insertLeveled(t, svc, uid, cid, "Fighter", 1, 1)
+	long, err := svc.Catalog.ItemBySlug("longsword")
+	if err != nil {
+		t.Fatal(err)
+	}
+	it, err := svc.AddItem(ch, uid, AddItemInput{CatalogID: long.ID, EquipNow: true, EquipSlot: "main_hand"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Get(ch.ID)
+	got, ok := ch.InventoryByID(it.ID)
+	if !ok || !got.CanAttack() {
+		t.Fatalf("equipped weapon %+v ok=%v", got, ok)
+	}
+	atk, ok := ch.WeaponAttack(got, false)
+	if !ok || !atk.Proficient {
+		t.Fatalf("fighter longsword attack %+v ok=%v", atk, ok)
+	}
+	if atk.Line != "+1 to hit · 1d8-1 slashing" {
+		t.Fatalf("expected STR -1 + PB 2, got %q", atk.Line)
+	}
+	eq := equippedRows(ch)
+	if len(eq) != 1 || eq[0].Stats != atk.Line {
+		t.Fatalf("equipped stats %+v want %q", eq, atk.Line)
+	}
+
+	spare, err := svc.AddItem(ch, uid, AddItemInput{CatalogID: long.ID, CustomName: "Spare blade"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Get(ch.ID)
+	packItem, ok := ch.InventoryByID(spare.ID)
+	if !ok {
+		t.Fatal("missing pack sword")
+	}
+	packStat := itemRowStats(packItem)
+	if strings.Contains(packStat, "to hit") {
+		t.Fatalf("pack should stay item-only, got %q", packStat)
+	}
+	for _, row := range packRows(ch) {
+		if row.ID == spare.ID && strings.Contains(row.Stats, "to hit") {
+			t.Fatalf("pack row %q", row.Stats)
+		}
+	}
+
+	wiz := insertLeveled(t, svc, uid, cid, "Wizard", 2, 1)
+	wizSword, err := svc.AddItem(wiz, uid, AddItemInput{CatalogID: long.ID, EquipNow: true, EquipSlot: "main_hand"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wiz, _ = svc.Get(wiz.ID)
+	got, _ = wiz.InventoryByID(wizSword.ID)
+	wizAtk, _ := wiz.WeaponAttack(got, false)
+	if wizAtk.Proficient || wizAtk.Line != "-1 to hit · 1d8-1 slashing" {
+		t.Fatalf("wizard longsword %+v", wizAtk)
+	}
+}

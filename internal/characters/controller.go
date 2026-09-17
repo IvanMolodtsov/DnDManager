@@ -64,6 +64,8 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("GET /characters/{id}/items/{itemID}/features/search", auth(http.HandlerFunc(c.searchItemFeatures)))
 	mux.Handle("POST /characters/{id}/items/{itemID}/roll", auth(http.HandlerFunc(c.rollCatalogItem)))
 	mux.Handle("POST /characters/{id}/items", auth(http.HandlerFunc(c.addItem)))
+	mux.Handle("GET /characters/{id}/items/{invID}/attack", auth(http.HandlerFunc(c.weaponAttackModal)))
+	mux.Handle("POST /characters/{id}/items/{invID}/attack/roll", auth(http.HandlerFunc(c.rollWeaponAttack)))
 	mux.Handle("POST /characters/{id}/items/{invID}/equip", auth(http.HandlerFunc(c.equipItem)))
 	mux.Handle("POST /characters/{id}/items/{invID}/unequip", auth(http.HandlerFunc(c.unequipItem)))
 	mux.Handle("POST /characters/{id}/items/{invID}/qty", auth(http.HandlerFunc(c.qtyItem)))

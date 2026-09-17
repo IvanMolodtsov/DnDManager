@@ -38,13 +38,25 @@
             {{if .Stats}}<p class="text-xs text-parchment/60">{{.Stats}}</p>{{end}}
             {{if .Notes}}<p class="text-xs text-parchment/45">{{.Notes}}</p>{{end}}
           </div>
-          {{if $.IsOwner}}
-            <form method="post" action="/characters/{{$.Character.ID}}/items/{{.ID}}/unequip"
-                  hx-post="/characters/{{$.Character.ID}}/items/{{.ID}}/unequip"
-                  hx-target="#sheet-inventory" hx-swap="outerHTML">
-              <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
-              <button class="btn-ghost" type="submit">{{ t "character.inventory.unequip" }}</button>
-            </form>
+          {{if or .CanAttack $.IsOwner}}
+            <div class="flex flex-wrap items-center gap-2">
+              {{if .CanAttack}}
+                <button class="btn-gold" type="button"
+                        hx-get="/characters/{{$.Character.ID}}/items/{{.ID}}/attack"
+                        hx-target="#spell-use-body" hx-swap="innerHTML"
+                        hx-on::after-request="document.getElementById('spell-use-modal').showModal()">
+                  {{ t "common.use" }}
+                </button>
+              {{end}}
+              {{if $.IsOwner}}
+                <form method="post" action="/characters/{{$.Character.ID}}/items/{{.ID}}/unequip"
+                      hx-post="/characters/{{$.Character.ID}}/items/{{.ID}}/unequip"
+                      hx-target="#sheet-inventory" hx-swap="outerHTML">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                  <button class="btn-ghost" type="submit">{{ t "character.inventory.unequip" }}</button>
+                </form>
+              {{end}}
+            </div>
           {{end}}
         </li>
       {{end}}

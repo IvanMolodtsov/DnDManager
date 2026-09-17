@@ -73,6 +73,16 @@ func (c *Character) ClassRules() []rules.ClassLevel {
 	return out
 }
 
+func (c *Character) ClassSlugs() []string {
+	out := make([]string, 0, len(c.ClassLevels))
+	for _, cl := range c.ClassLevels {
+		if cl.Slug != "" {
+			out = append(out, cl.Slug)
+		}
+	}
+	return out
+}
+
 func (c *Character) BaseScores() rules.AbilityScores {
 	return rules.AbilityScores{STR: c.STR, DEX: c.DEX, CON: c.CON, INT: c.INT, WIS: c.WIS, CHA: c.CHA}
 }
@@ -172,6 +182,21 @@ func (it InventoryItem) DisplayName(lang string) string {
 }
 
 func (it InventoryItem) Equipped() bool { return it.EquippedSlot != "" }
+
+func (it InventoryItem) CanAttack() bool {
+	if it.Weapon == nil {
+		return false
+	}
+	return it.EquippedSlot == rules.SlotMainHand || it.EquippedSlot == rules.SlotOffHand
+}
+
+func (c *Character) WeaponAttack(it InventoryItem, thrown bool) (rules.WeaponAttack, bool) {
+	if it.Weapon == nil {
+		return rules.WeaponAttack{}, false
+	}
+	twoH := it.TwoHanded || it.Item.IsTwoHanded()
+	return rules.DeriveWeaponAttack(c.Scores(), c.Level, c.ClassSlugs(), *it.Weapon, twoH, thrown), true
+}
 
 func (it InventoryItem) HasOverlay() bool {
 	if strings.TrimSpace(it.CustomName) != "" || strings.TrimSpace(it.Notes) != "" || it.TwoHanded {
