@@ -21,7 +21,7 @@ Keep this file and `AGENTS.md` in sync when product behavior changes.
 
 Spring-style **DTO / Service / Repository / Controller** under `internal/{platform,users,campaigns,catalog,rules,characters}` plus stubs `items` / `abilities`. Templates in `web/templates`.
 
-Sheet HTMX islands: `#sheet-stats` (abilities/skills), `#sheet-magic` (resources/spells), `#sheet-vitals` (defense + statuses), `#sheet-inventory` (equipped / pack / consumables). Spell/check modal is `#spell-use-modal`. Item add wizard is `#item-add-modal`. Casting a spell or equipping/using an item swaps the island and OOB-updates `#sheet-vitals` (equip also OOB-updates `#sheet-stats` and `#sheet-magic` for grants).
+Sheet HTMX islands: `#sheet-stats` (abilities/skills), `#sheet-magic` (resources/spells), `#sheet-vitals` (defense + statuses), `#sheet-inventory` (equipped / pack / consumables). Spell/check/weapon-attack modal is `#spell-use-modal`. Item add wizard is `#item-add-modal`. Casting a spell or equipping/using an item swaps the island and OOB-updates `#sheet-vitals` (equip also OOB-updates `#sheet-stats` and `#sheet-magic` for grants).
 
 ## Access
 
@@ -84,12 +84,12 @@ Draft until confirm:
 - **Features** are one stat + value + origin (`base` / `common` / `magical` / `unique`). Pickers: `grant_spell` / `grant_cantrip` (value = catalog spell id, dropdown filtered by level), `skill_proficiency`, `resistance` / `vulnerability` / `immunity`, `condition_immunity`, `ability_bonus` / `ability_penalty`. Base hit lives on the weapon (`WeaponDTO.BaseHit`), not as a feature. `ArmorDTO` / `JewelryDTO` hold category/AC/slot. Do not encode Moonblade d100 tables — the player stores the chosen features. Catalog item id for builder weapons/armor is the **base**; custom name holds “Moonblade”.
 - Slots: armor, shield, main_hand, off_hand, head, cloak, neck, ring_1/ring_2, gloves, boots, belt. Two-handed occupies main+off. Shield occupies shield **and** off-hand. Rings auto-pick. Equip **blocks** if occupied (names the other item); no auto-swap.
 - **House rule:** attune on equip / unattune on unequip, max **3**. Equipped grants apply only while worn (virtual prepared spells, skill overlay, ability bonus, resistance line under defense). Unequip drops them immediately.
-- Sheet attack/damage line is **derived** from `BaseHit` + features (sum bonuses, keep base dice + type). Weapon **Use** modal still TODO.
+- Equipped weapon subtitle is character-relative (`+6 to hit · 1d8+4 slashing`): melee STR, ranged DEX, finesse = higher of STR/DEX (shown); thrown melee keeps that melee ability. To hit is ability + PB if proficient + item `atk_bonus`. Damage is weapon dice + ability + item `dmg_bonus`; extra-dice features are a second IRL/roll line. Proficiency uses encoded PHB 2014 class weapon lists (multiclass union; match `WeaponDTO.BaseSlug` + `InheritWeaponSlug`, else simple/martial). Versatile 2H uses `VersatileDice` unless throwing (stays 1H dice). Pack stays item-only (`BaseHit` + features). **Use** on equipped main/off-hand opens the spell-style modal (IRL + Auto-calculate; owner rolls, DM read-only; no ammo/charge spend, distinct from consumable `POST .../use`).
 - Catalog item/spell/base search is Unicode case-insensitive (SQLite `LIKE`/`NOCASE` is ASCII-only). Debounce 300ms; do not remount the search input. Wizard 422 keeps `HX-Retarget` / innerHTML swap.
 - Base weapons link to `https://5e14.dnd.su/articles/inventory/96-arms/`; armor/shields to `https://5e14.dnd.su/articles/inventory/95-armor-and-shields/` (encoded PHB tables; **no HTML scrape**). Magic artifacts keep `catalog_items` 5e14 item URLs. RU locale uses `desc_ru` if present; otherwise EN SRD + the 5e14 link.
 - Stack mundane/consumables with no **manual** features; never stack magic/stub/configured rows.
 - Consumable **Use** decrements (delete at 0). `potion-of-speed` → haste-like status `source=potion`. Healing potions roll into current HP. Unknown: decrement only.
-- **TODO:** weapon attack Use modal, skill/save *numeric* item bonuses beyond proficiency, starting equipment, rest charge refill, d6/dawn recharge.
+- **TODO:** skill/save *numeric* item bonuses beyond proficiency, starting equipment, rest charge refill, d6/dawn recharge.
 
 ## Combat / statuses
 

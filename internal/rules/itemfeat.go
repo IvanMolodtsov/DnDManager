@@ -20,18 +20,18 @@ const (
 	OriginMagical = "magical"
 	OriginUnique  = "unique"
 
-	StatAtkBonus    = "atk_bonus"
-	StatDmgBonus    = "dmg_bonus"
-	StatExtraDice   = "extra_dice"
-	StatCritRange   = "crit_range"
-	StatACBonus     = "ac_bonus"
-	StatACBase      = "ac_base"
-	StatACFloor     = "ac_floor"
-	StatSpeedBonus  = "speed_bonus"
-	StatSpeedMult   = "speed_mult"
-	StatVersatile   = "versatile"
-	StatThrown      = "thrown"
-	StatProperty    = "property"
+	StatAtkBonus          = "atk_bonus"
+	StatDmgBonus          = "dmg_bonus"
+	StatExtraDice         = "extra_dice"
+	StatCritRange         = "crit_range"
+	StatACBonus           = "ac_bonus"
+	StatACBase            = "ac_base"
+	StatACFloor           = "ac_floor"
+	StatSpeedBonus        = "speed_bonus"
+	StatSpeedMult         = "speed_mult"
+	StatVersatile         = "versatile"
+	StatThrown            = "thrown"
+	StatProperty          = "property"
 	StatPersonality       = "personality"
 	StatNote              = "note"
 	StatSkillProficiency  = "skill_proficiency"
@@ -214,15 +214,18 @@ func HasProperty(feats []FeatureDTO, slug string) bool {
 
 // WeaponDTO is the typed payload for a weapon instance. Base hit lives here, not as a feature.
 type WeaponDTO struct {
-	Name       string
-	BaseSlug   string
-	BaseHit    string
-	DamageType string
-	Simple     bool
-	Martial    bool
-	Melee      bool
-	Ranged     bool
-	Features   []FeatureDTO
+	Name          string
+	BaseSlug      string
+	BaseHit       string
+	DamageType    string
+	Simple        bool
+	Martial       bool
+	Melee         bool
+	Ranged        bool
+	Finesse       bool
+	Thrown        bool
+	VersatileDice string
+	Features      []FeatureDTO
 }
 
 func WeaponFromItem(item catalog.Item, name string, feats []FeatureDTO) *WeaponDTO {
@@ -231,8 +234,21 @@ func WeaponFromItem(item catalog.Item, name string, feats []FeatureDTO) *WeaponD
 		Name: name, BaseSlug: item.Slug, BaseHit: item.DamageDice, DamageType: item.DamageType,
 		Simple:  strings.EqualFold(item.WeaponCategory, "simple"),
 		Martial: strings.EqualFold(item.WeaponCategory, "martial"),
-		Melee:   !ranged, Ranged: ranged, Features: feats,
+		Melee:   !ranged, Ranged: ranged,
+		Finesse:       item.HasProperty("finesse") || HasProperty(feats, "finesse"),
+		Thrown:        item.HasProperty("thrown") || HasProperty(feats, "thrown"),
+		VersatileDice: firstNonEmpty(item.VersatileDice, versatileDice(feats)),
+		Features:      feats,
 	}
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 // DerivedItemStats is the sheet formula built from base hit plus one-stat features.

@@ -104,7 +104,7 @@ func spellRows(ch *Character, preparedOnly bool, lang string) []SpellRow {
 			}
 			out = append(out, SpellRow{
 				Spell: g.Spell, Prepared: true,
-				Stats: g.Spell.StatsLine(slot, ch.Level),
+				Stats:  g.Spell.StatsLine(slot, ch.Level),
 				CanUse: true, SlotHint: slot,
 				FromItem: g.ItemName(lang), ItemKind: true,
 			})
@@ -216,9 +216,27 @@ func equippedRows(ch *Character) []ItemRow {
 		if !ok {
 			continue
 		}
-		out = append(out, ItemRow{InventoryItem: it, SlotKey: slot, Stats: itemRowStats(it)})
+		out = append(out, ItemRow{InventoryItem: it, SlotKey: slot, Stats: equippedRowStats(ch, it)})
 	}
 	return out
+}
+
+func equippedRowStats(ch *Character, it InventoryItem) string {
+	if it.CanAttack() {
+		if atk, ok := ch.WeaponAttack(it, false); ok && atk.Line != "" {
+			line := atk.Line
+			for _, f := range it.Features {
+				if s := f.SentientLine(); s != "" {
+					if line != "" {
+						line += " · "
+					}
+					line += s
+				}
+			}
+			return line
+		}
+	}
+	return itemRowStats(it)
 }
 
 func packRows(ch *Character) []ItemRow {

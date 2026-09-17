@@ -1,0 +1,81 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{.Item.DisplayName .Lang}}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('spell-use-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-sm text-parchment/70">
+    {{ t (printf "ability.%s" .Attack.AbilityKey) }}{{if .Attack.Finesse}} · {{ t "character.weapon.finesse" }}{{end}}
+    · {{if .Attack.Proficient}}{{ t "character.weapon.proficient" }}{{else}}{{ t "character.weapon.not_proficient" }}{{end}}
+    · {{bonusFmt .Attack.ToHit}}
+  </p>
+  {{template "error" .}}
+
+  {{if .Attack.HasThrown}}
+    <fieldset class="mt-3">
+      <legend class="text-sm text-parchment/70">{{ t "character.weapon.throw_mode" }}</legend>
+      <label class="mt-2 flex items-center gap-2 text-sm">
+        <input type="radio" name="thrown" value="0" {{if not .Thrown}}checked{{end}}
+               hx-get="/characters/{{.Character.ID}}/items/{{.Item.ID}}/attack"
+               hx-vals='{"thrown":"0"}'
+               hx-target="#spell-use-body" hx-swap="innerHTML">
+        <span>{{ t "character.weapon.melee" }}</span>
+      </label>
+      <label class="mt-2 flex items-center gap-2 text-sm">
+        <input type="radio" name="thrown" value="1" {{if .Thrown}}checked{{end}}
+               hx-get="/characters/{{.Character.ID}}/items/{{.Item.ID}}/attack"
+               hx-vals='{"thrown":"1"}'
+               hx-target="#spell-use-body" hx-swap="innerHTML">
+        <span>{{ t "character.weapon.thrown" }}</span>
+      </label>
+    </fieldset>
+  {{end}}
+
+  <p class="mt-3 text-sm">{{ t "character.spells.irl" }}</p>
+  <p class="mt-1 text-xs text-parchment/60">{{ t "character.weapon.hit" }}</p>
+  <p class="font-mono text-gold">{{.Attack.HitFormula}}</p>
+  {{if .Attack.DamageFormula}}
+    <p class="mt-2 text-xs text-parchment/60">{{ t "character.weapon.damage" }}</p>
+    <p class="font-mono text-gold">{{.Attack.DamageFormula}}{{if .Attack.DamageType}} {{.Attack.DamageType}}{{end}}</p>
+  {{end}}
+  {{range .Attack.Extra}}
+    <p class="mt-2 text-xs text-parchment/60">{{ t "character.weapon.extra" }}</p>
+    <p class="font-mono text-gold">{{.}}</p>
+  {{end}}
+
+  {{if not .ReadOnly}}
+    <form class="mt-4">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <input type="hidden" name="thrown" value="{{if .Thrown}}1{{else}}0{{end}}">
+      <button class="btn-gold" type="button"
+              hx-post="/characters/{{.Character.ID}}/items/{{.Item.ID}}/attack/roll"
+              hx-target="#spell-use-body" hx-swap="innerHTML"
+              hx-include="closest form">
+        {{ t "character.spells.autocalc" }}
+      </button>
+    </form>
+  {{else}}
+    <p class="mt-4 text-xs text-parchment/50">{{ t "character.weapon.dm_readonly" }}</p>
+  {{end}}
+
+  {{if .HitRoll}}
+    <div class="mt-4 rounded border border-gold/30 px-3 py-2">
+      <p class="text-xs text-parchment/60">{{ t "character.weapon.hit" }} · {{ t "character.spells.roll" }}</p>
+      <p class="font-display text-2xl text-gold">{{.HitRoll.Total}}</p>
+      <p class="text-xs text-parchment/50">{{range $i, $p := .HitRoll.Parts}}{{if $i}} · {{end}}{{$p}}{{end}}</p>
+    </div>
+  {{end}}
+  {{if .DamageRoll}}
+    <div class="mt-3 rounded border border-gold/30 px-3 py-2">
+      <p class="text-xs text-parchment/60">{{ t "character.weapon.damage" }} · {{ t "character.spells.roll" }}</p>
+      <p class="font-display text-2xl text-gold">{{.DamageRoll.Total}}</p>
+      <p class="text-xs text-parchment/50">{{range $i, $p := .DamageRoll.Parts}}{{if $i}} · {{end}}{{$p}}{{end}}</p>
+    </div>
+  {{end}}
+  {{range .ExtraRolls}}
+    <div class="mt-3 rounded border border-gold/30 px-3 py-2">
+      <p class="text-xs text-parchment/60">{{ t "character.weapon.extra" }} · {{ t "character.spells.roll" }}</p>
+      <p class="font-display text-2xl text-gold">{{.Total}}</p>
+      <p class="text-xs text-parchment/50">{{range $i, $p := .Parts}}{{if $i}} · {{end}}{{$p}}{{end}}</p>
+    </div>
+  {{end}}
+</div>
