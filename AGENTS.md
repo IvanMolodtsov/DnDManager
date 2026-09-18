@@ -49,6 +49,7 @@ Draft until confirm:
 - Use 5eapi `/api/2014/` when it returns 200.
 - **No scraping article body.**
 - Seed **PHB classes only** (no Artificer, sidekicks, or homebrew). ~378 spells.
+- Monsters: `scripts/genmonsters` writes `014`. 5eapi 2014 monsters (fightable HP/AC/CR/DEX/resist/actions) plus 5e14 URLs when names match. 5e14-only cards (Spiderdragon, adventure NPCs, MotM, …) are **stubs**: name_en/ru, slug, canonical 5e14 URL, CR/type from the **index/filter JSON** (`piece/bestiary/index-list` + `/bestiary/` listing maps). `is_stub=1`, HP 0. **No article-body scrape.** WotC sources included; skip a huge homebrew dump if that group appears, but always keep Spiderdragon (and similar unique names). IDs: 5e14 numeric when matched or stubbed; 5eapi-only from `1000000` by slug sort. Regen: `go run ./scripts/genmonsters` from repo root (needs network). Search is Unicode case-insensitive; filter danger = CR; SRD rows sort before stubs. Stub add uses 1 HP so the DM can HP-edit immediately. Changing `014` does not reseed an already-migrated `data/dnd.db` — re-run that file’s DELETE+INSERT (and `ALTER TABLE catalog_monsters ADD COLUMN is_stub …` if the column is missing). Battle units snapshot names/HP, so live fights stay intact.
 - Items: `scripts/genitems` writes `010`. 5eapi 2014 equipment + magic-items (stats + SRD `desc`) plus 5e14 **DMG stubs** (Moonblade etc.) that need manual configure. Filter 5e14 to WotC DMG (source 101); skip homebrew. IDs: 5e14 numeric when matched; 5eapi-only from `1000000` by slug sort. **No scraping article body.** Regen: `go run ./scripts/genitems` from repo root (needs network).
 - PHB arms: migration `012` flags ~37 bases (`is_base`) and overlays RU names / PHB properties / the arms-table URL. Structured table in `internal/catalog/phb_arms.go` (same idea as `scripts/genspells/formulas.go`). Generic one-stat defs live in `catalog_stat_features` (class/race grants stay in `catalog_features`).
 - PHB armor: migration `013` flags 12 suits + shield as `is_base` and overlays RU names / PHB AC / `https://5e14.dnd.su/articles/inventory/95-armor-and-shields/`. Table in `internal/catalog/phb_armor.go`. Jewelry has no PHB table — slot bases `ring` / `neck` / `cloak` / `head` / `gloves` / `boots` / `belt` (`kind=jewelry`, ids `2000001+`).
@@ -95,7 +96,7 @@ Draft until confirm:
 
 ## Data
 
-- Migrations `001`–`013`. `data/` is not in git. Do not commit `.cursor/mcp.json`.
+- Migrations `001`–`014`. `data/` is not in git. Do not commit `.cursor/mcp.json`.
 - Restart (or let Air restart) after adding SQL.
 
 ## Process
