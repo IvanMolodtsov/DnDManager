@@ -452,7 +452,8 @@ func (r *Repository) UpdateVitals(characterID int64, hpCurrent, hpTemp, deathSuc
 func (r *Repository) ListEffects(characterID int64) ([]rules.Effect, error) {
 	rows, err := r.DB.Query(`
 		SELECT id, slug, kind, name_en, name_ru, source_spell_id, source, duration_key, formula_en, formula_ru,
-		       ac_bonus, ac_base, ac_floor, speed_bonus, speed_mult, temp_hp, tags
+		       ac_bonus, ac_base, ac_floor, speed_bonus, speed_mult, temp_hp, tags,
+		       hidden, remove_on_battle_end, duration_turns, damage_formula, damage_type, source_url
 		FROM character_effects WHERE character_id = ? ORDER BY id`, characterID)
 	if err != nil {
 		return nil, err
@@ -460,14 +461,10 @@ func (r *Repository) ListEffects(characterID int64) ([]rules.Effect, error) {
 	defer rows.Close()
 	var out []rules.Effect
 	for rows.Next() {
-		var e rules.Effect
-		var spellID sql.NullInt64
-		if err := rows.Scan(&e.ID, &e.Slug, &e.Kind, &e.NameEN, &e.NameRU, &spellID,
-			&e.Source, &e.DurationKey, &e.FormulaEN, &e.FormulaRU,
-			&e.ACBonus, &e.ACBase, &e.ACFloor, &e.SpeedBonus, &e.SpeedMult, &e.TempHP, &e.Tags); err != nil {
+		e, err := scanEffect(rows)
+		if err != nil {
 			return nil, err
 		}
-		e.SourceSpellID = spellID.Int64
 		out = append(out, e)
 	}
 	return out, rows.Err()
@@ -477,19 +474,44 @@ func (r *Repository) UpsertEffect(characterID int64, e rules.Effect) error {
 	_, err := r.DB.Exec(`
 		INSERT INTO character_effects (
 			character_id, slug, kind, name_en, name_ru, source_spell_id, source, duration_key, formula_en, formula_ru,
-			ac_bonus, ac_base, ac_floor, speed_bonus, speed_mult, temp_hp, tags
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ac_bonus, ac_base, ac_floor, speed_bonus, speed_mult, temp_hp, tags,
+			hidden, remove_on_battle_end, duration_turns, damage_formula, damage_type, source_url
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(character_id, slug) DO UPDATE SET
 			kind = excluded.kind, name_en = excluded.name_en, name_ru = excluded.name_ru,
 			source_spell_id = excluded.source_spell_id, source = excluded.source,
 			duration_key = excluded.duration_key, formula_en = excluded.formula_en, formula_ru = excluded.formula_ru,
 			ac_bonus = excluded.ac_bonus, ac_base = excluded.ac_base, ac_floor = excluded.ac_floor,
 			speed_bonus = excluded.speed_bonus, speed_mult = excluded.speed_mult,
-			temp_hp = excluded.temp_hp, tags = excluded.tags`,
+			temp_hp = excluded.temp_hp, tags = excluded.tags,
+			hidden = excluded.hidden, remove_on_battle_end = excluded.remove_on_battle_end,
+			duration_turns = excluded.duration_turns, damage_formula = excluded.damage_formula,
+			damage_type = excluded.damage_type, source_url = excluded.source_url`,
 		characterID, e.Slug, e.Kind, e.NameEN, e.NameRU, nullIfZero(e.SourceSpellID),
 		nz(e.Source, "spell"), e.DurationKey, e.FormulaEN, e.FormulaRU,
-		e.ACBonus, e.ACBase, e.ACFloor, e.SpeedBonus, e.SpeedMult, e.TempHP, e.Tags)
+		e.ACBonus, e.ACBase, e.ACFloor, e.SpeedBonus, e.SpeedMult, e.TempHP, e.Tags,
+		boolInt(e.Hidden), boolInt(e.RemoveOnBattleEnd), e.DurationTurns, e.DamageFormula, e.DamageType, e.SourceURL)
 	return err
+}
+
+type effectScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanEffect(row effectScanner) (rules.Effect, error) {
+	var e rules.Effect
+	var spellID sql.NullInt64
+	var hidden, removeEnd int
+	if err := row.Scan(&e.ID, &e.Slug, &e.Kind, &e.NameEN, &e.NameRU, &spellID,
+		&e.Source, &e.DurationKey, &e.FormulaEN, &e.FormulaRU,
+		&e.ACBonus, &e.ACBase, &e.ACFloor, &e.SpeedBonus, &e.SpeedMult, &e.TempHP, &e.Tags,
+		&hidden, &removeEnd, &e.DurationTurns, &e.DamageFormula, &e.DamageType, &e.SourceURL); err != nil {
+		return e, err
+	}
+	e.SourceSpellID = spellID.Int64
+	e.Hidden = hidden != 0
+	e.RemoveOnBattleEnd = removeEnd != 0
+	return e, nil
 }
 
 func nz(s, fallback string) string {

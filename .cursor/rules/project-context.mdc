@@ -19,16 +19,17 @@ Keep this file and `AGENTS.md` in sync when product behavior changes.
 
 ## Layout
 
-Spring-style **DTO / Service / Repository / Controller** under `internal/{platform,users,campaigns,catalog,rules,characters}` plus stubs `items` / `abilities`. Templates in `web/templates`.
+Spring-style **DTO / Service / Repository / Controller** under `internal/{platform,users,campaigns,catalog,rules,characters,battles}` plus stubs `items` / `abilities`. Templates in `web/templates`.
 
-Sheet HTMX islands: `#sheet-stats` (abilities/skills), `#sheet-magic` (resources/spells), `#sheet-vitals` (defense + statuses), `#sheet-inventory` (equipped / pack / consumables). Spell/check/weapon-attack modal is `#spell-use-modal`. HP/temp damage and heal modal is `#hp-adjust-modal`. Item add wizard is `#item-add-modal`. Casting a spell or equipping/using an item swaps the island and OOB-updates `#sheet-vitals` (equip also OOB-updates `#sheet-stats` and `#sheet-magic` for grants). After HP/temp apply, the submitter swaps from the POST (OOB `#sheet-vitals`); other viewers with `CanView` refresh `#sheet-vitals` over **SSE** (`GET /characters/{id}/events`, EventSource → `GET /characters/{id}/vitals`).
+Sheet HTMX islands: `#sheet-stats` (abilities/skills), `#sheet-magic` (resources/spells), `#sheet-vitals` (defense + statuses), `#sheet-inventory` (equipped / pack / consumables). Spell/check/weapon-attack modal is `#spell-use-modal`. HP/temp damage and heal modal is `#hp-adjust-modal`. DM **Add status** modal is `#status-add-modal`. Item add wizard is `#item-add-modal`. Casting a spell or equipping/using an item swaps the island and OOB-updates `#sheet-vitals` (equip also OOB-updates `#sheet-stats` and `#sheet-magic` for grants). After HP/temp apply, the submitter swaps from the POST (OOB `#sheet-vitals`); other viewers with `CanView` refresh `#sheet-vitals` over **SSE** (`GET /characters/{id}/events`, EventSource → `GET /characters/{id}/vitals`). Campaign fight island is `#battle-board` on `/campaigns/{id}/battle` (SSE `GET /campaigns/{id}/battle/events`, event `battle`). After status apply/tick/remove, both hubs fire (sheet vitals + battle board).
 
 ## Access
 
 - Open registration. First registered user is **Admin**.
 - **DM is campaign-scoped**: the campaign creator is DM of that campaign (not a global role).
 - Join via invite codes.
-- Players edit their own characters. Campaign DM may edit HP, temp HP, death saves, and remove statuses; other sheet mutations stay owner-only. Fellow players cannot edit.
+- Players edit their own characters. Campaign DM may edit HP, temp HP, death saves, and apply/remove statuses; other sheet mutations stay owner-only. Fellow players cannot edit. **Players cannot add statuses.** Owner may remove non-hidden statuses; hidden (curse) rows are DM-only to see and remove.
+- All campaign members can GET `/campaigns/{id}/battle`. Monster HP/CR/ability scores/resist/5e14 preview **and monster statuses**: **DM only**. Player names, order, round, player HP/knocked/dead, and **non-hidden PC statuses**: everyone. Hidden PC statuses: DM-only on sheet and board. Start/mutate the fight: campaign DM.
 
 ## Character wizard
 
@@ -59,6 +60,7 @@ Draft until confirm:
 - PHB arms: migration `012` flags ~37 bases (`is_base`) and overlays RU names / PHB properties / the arms-table URL. Structured table in `internal/catalog/phb_arms.go` (same idea as `scripts/genspells/formulas.go`). Generic one-stat defs live in `catalog_stat_features` (class/race grants stay in `catalog_features`).
 - PHB armor: migration `013` flags 12 suits + shield as `is_base` and overlays RU names / PHB AC / `https://5e14.dnd.su/articles/inventory/95-armor-and-shields/`. Table in `internal/catalog/phb_armor.go`. Jewelry has no PHB table — slot bases `ring` / `neck` / `cloak` / `head` / `gloves` / `boots` / `belt` (`kind=jewelry`, ids `2000001+`).
 - Parameterized pickers and DMG artifact templates are seeded in `013` (`catalog_stat_features`). Mechanics encoded in `internal/catalog/dmg_artifacts.go` (link `https://5e14.dnd.su/articles/inventory/139-artifacts/`; **no HTML scrape**, no d100 roller).
+- PHB conditions: migration `017` + table in `internal/catalog/phb_conditions.go` (Appendix A: blinded…unconscious, plus **Burning** as a 1d6 fire overlay). 5e14 link is the conditions article `https://5e14.dnd.su/articles/mechanics/27-conditions/` (same pattern as the arms table — **never invent** `/condition/poisoned/`). EN provenance is 5eapi `/api/2014/conditions/{slug}`. Search is Unicode case-insensitive.
 - Many PHB spells have **empty 5eapi damage** (Hex, Witch Bolt, Chromatic Orb, …). Overlay in `scripts/genspells/formulas.go` + migration `006`. Regen of `004` should call `applyPHBFormula`. Do not scrape dnd.su lore for dice.
 
 ## Spells UI
@@ -95,13 +97,24 @@ Draft until confirm:
 ## Combat / statuses
 
 - **Defense** (`sheet_combat.html`): current HP and **temp HP** ± open a **modal** (`#hp-adjust-modal`; do not step by 1 on the button). HP − is typed damage (PHB types): equipped item **immunity → 0**, **resistance → half (round down)**, **vulnerability → double**; resist+vuln cancel (×1). **RAW temp HP first** (`ReduceStackedTemp`), remainder hits current HP. HP + heals current HP only (clamp to HPMax, no temp restore). Temp ± is an amount only (no type, no resist; `AdjustTempHP` / `other-temp`). Owner or campaign DM (`RequireCombatEdit`); viewers without edit do not get ±. Death-save pips, derived **AC** / **speed**, short **resistance/immunity** line from equipped features. Death saves clear when current HP > 0. Apply result (e.g. “10 slashing, resistance, 5 applied”) shows in the modal; `#sheet-vitals` refreshes for owner and DM via **SSE**.
-- **Statuses** (`sheet_statuses.html`): separate block — name, numeric formula, duration, source (`spell` / `potion` / `ability` / `other`), **Remove** (owner or campaign DM).
+- **Statuses** (`sheet_statuses.html`): name, formula, duration, source (`spell` / `potion` / `ability` / `other`), **Remove**. DM **Add status** (sheet or battle board) picks a catalog condition or a custom name/formula/URL. Fields: optional damage formula+type, AC bonus, duration in **battle turns** (0 = not turn-limited), **Remove on battle end**, **Hidden from players**. PCs stay on `character_effects`; monsters use `battle_unit_effects`.
+- Hidden statuses never appear on player HTML and never affect player Auto-calculate (skills/saves/weapon/spell) or `DeriveCombat` / `ApplyDamage` math. Equipped item resists still apply on the DM damage modal. Hidden DoT still ticks at start of turn (DM server action).
+- **DoT / duration:** damaging formula+type ticks at the **start** of that unit’s turn (`RollFormula` + `ApplyDamage` / `ApplyUnitDamage`). Duration decrements at the **end** of that unit’s turn; hitting 0 removes the row. Poisoned is a named condition (disadvantage is IRL) — no HP tick unless a formula is set. Burning defaults to 1d6 fire when picked from catalog.
 - **House rule:** temp HP from **different sources stack**. Recasting the **same** spell slug refreshes that row. Manual temp ± uses an `other-temp` status.
-- AC/speed: unarmored (10+DEX, Monk UD, Barbarian UD, Monk unarmored movement) plus **worn armor/shield** and statuses. Light +DEX, medium +min(DEX, cap), heavy no DEX, shield +2. Monk UD off if armor or shield; Barb UD off if armor (shield OK). Mage Armor `ACBase` ignored while wearing armor. Instance AC/speed overlays stack. Duration is **displayed**, not ticked down. **Numeric equipment bonuses to skills/saves still TODO.**
+- AC/speed: unarmored (10+DEX, Monk UD, Barbarian UD, Monk unarmored movement) plus **worn armor/shield** and **non-hidden** statuses. Light +DEX, medium +min(DEX, cap), heavy no DEX, shield +2. Monk UD off if armor or shield; Barb UD off if armor (shield OK). Mage Armor `ACBase` ignored while wearing armor. Instance AC/speed overlays stack. Clock durations (`DurationKey`) are **displayed**; battle `duration_turns` ticks as above. **Numeric equipment bonuses to skills/saves still TODO.**
+- Damage at 0 current HP adds **+1 death fail**. Three fails = dead. Healing stands the character up unless already dead (heal after death is a no-op).
+
+## Battle
+
+- Dedicated `/campaigns/{id}/battle`. Campaign show: **Start battle** (DM) or **Open battle** if a row exists. **One encounter per campaign** until the DM dismisses. Loot is out of scope.
+- Wizard: add catalog monsters (qty → one unit row each; debounce 300ms, do not remount search). Setup list is grouped; DM **Edit** sets HP/AC/six ability scores and resist/immune/vuln on every copy of that type still in setup (catalog defaults; stubs start at 1 HP / scores 10). Edit modal (and DM fight-board stats) link the snapshotted 5e14 bestiary article (`source_url_ru`, else `source_url`; hide if empty; new tab). Snapshot lives on `battle_units` (score columns + `resist_json` + `source_url_ru`); later adds of that type inherit it. Typed monster damage uses that snapshot (resist/immune/vuln, same as PC grants). Then initiative (IRL or `1d20+DEX`). All campaign PCs auto-added. Sort initiative desc, DEX tie-break. Round starts at 1. **Next unit** skips dead and escaped; wrap increments round. Becoming active ticks damaging statuses; leaving the turn decrements `duration_turns`.
+- PC HP stays on `characters` (`ApplyHPDamage` / heal / death). Monster HP lives on `battle_units` with a resist snapshot (catalog regen does not mutate a live fight). HP ± reuses `#hp-adjust-modal`. Non-hidden monster status AC overlays the snapshot AC for the DM. DM **Add status** per unit.
+- Monster HP 0 = dead, greyed, skipped. PC HP 0 = knocked; on their turn the DM records one death save (IRL `1d20` + autocalc, 10+ success). 3 fails = dead. Board shows a labeled death-save pip row for knocked PCs (everyone sees player pips; record button stays DM). DM can mark **Escaped**. End anytime → stats dead/alive/escaped; PC statuses with **remove on battle end** are deleted, permanent PC statuses remain; **monster statuses always end with the fight**. Dismiss deletes the row.
+- Campaign SSE event `battle` refreshes `#battle-board`. PC sheet vitals keep per-character SSE.
 
 ## Data
 
-- Migrations `001`–`014`. `data/` is not in git. Do not commit `.cursor/mcp.json`.
+- Migrations `001`–`017`. `data/` is not in git. Do not commit `.cursor/mcp.json`.
 - Restart (or let Air restart) after adding SQL.
 
 ## Process

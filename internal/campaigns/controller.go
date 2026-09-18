@@ -22,10 +22,16 @@ type CharacterLister interface {
 	ListByCampaign(campaignID int64) ([]CharacterSummary, error)
 }
 
+// BattleFinder is implemented by battles.Service (avoids an import cycle).
+type BattleFinder interface {
+	HasBattle(campaignID int64) (bool, error)
+}
+
 // Controller serves campaign list, create, join, and the table page.
 type Controller struct {
 	Svc        *Service
 	Characters CharacterLister
+	Battles    BattleFinder
 	Render     *platform.Renderer
 }
 
@@ -114,6 +120,7 @@ type showView struct {
 	Characters []CharacterSummary
 	MemberRole string
 	IsDM       bool
+	HasBattle  bool
 }
 
 func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +153,14 @@ func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	hasBattle := false
+	if c.Battles != nil {
+		hasBattle, err = c.Battles.HasBattle(id)
+		if err != nil {
+			http.Error(w, "error", http.StatusInternalServerError)
+			return
+		}
+	}
 	v := showView{
 		BaseView:   c.base(r, camp.Name),
 		Campaign:   camp,
@@ -153,6 +168,7 @@ func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
 		Characters: chars,
 		MemberRole: mem.Role,
 		IsDM:       mem.Role == MemberDM,
+		HasBattle:  hasBattle,
 	}
 	c.Render.Render(w, "campaigns/show.html", v.Lang, http.StatusOK, v)
 }

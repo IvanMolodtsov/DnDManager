@@ -1,0 +1,87 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "battle.edit.title" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('monster-stats-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{if .EditGroup}}
+    <p class="mt-1 text-sm text-parchment/70">{{.EditGroup.Name}} × {{.EditGroup.Count}}{{if .EditGroup.CRLabel}} · CR {{.EditGroup.CRLabel}}{{end}}</p>
+    {{$src := .EditGroup.ArticleURL}}
+    {{if $src}}
+      <p class="mt-1 text-sm">
+        <a class="text-gold hover:underline" href="{{$src}}" target="_blank" rel="noopener">{{ t "battle.edit.article" }}</a>
+      </p>
+    {{end}}
+  {{end}}
+  <p class="mt-1 text-xs text-parchment/50">{{ t "battle.edit.note" }}</p>
+  {{template "error" .}}
+
+  {{if .EditGroup}}
+    <form class="mt-4 space-y-3"
+          hx-post="/campaigns/{{.Campaign.ID}}/battle/monsters/{{.EditGroup.CatalogID}}/edit"
+          hx-target="#monster-roster" hx-swap="outerHTML"
+          hx-on::after-request="if (event.detail.successful) document.getElementById('monster-stats-modal').close()">
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="block text-sm">
+          <span>{{ t "battle.hp.max" }}</span>
+          <input class="input" type="number" name="hp_max" min="1" max="999" value="{{.EditGroup.HPMax}}" required>
+        </label>
+        <label class="block text-sm">
+          <span>{{ t "battle.hp.current" }}</span>
+          <input class="input" type="number" name="hp_current" min="1" max="999" value="{{.EditGroup.HPCurrent}}" required>
+        </label>
+        <label class="block text-sm">
+          <span>{{ t "battle.ac" }}</span>
+          <input class="input" type="number" name="ac" min="0" max="40" value="{{.EditGroup.AC}}" required>
+        </label>
+      </div>
+      <p class="text-xs text-parchment/50">{{ t "battle.edit.scores.hint" }}</p>
+      <div class="grid gap-3 grid-cols-2 sm:grid-cols-3">
+        {{range .AbilityKeys}}
+          <label class="block text-sm">
+            <span>{{ t (printf "ability.%s" .) }}</span>
+            <input class="input" type="number" name="{{.}}" min="1" max="30" value="{{$.EditGroup.Score .}}" required>
+            <span class="mt-1 block text-xs text-parchment/50">{{ t "character.saves.short" }} {{$.EditGroup.SaveHint .}}</span>
+          </label>
+        {{end}}
+      </div>
+      <fieldset>
+        <legend class="text-sm">{{ t "battle.edit.resist" }}</legend>
+        <div class="monster-trait-grid">
+          {{range .DamageTypes}}
+            <label class="flex items-center gap-1 text-xs">
+              <input type="checkbox" name="resist" value="{{.Slug}}" {{if $.EditGroup.HasResist .Slug}}checked{{end}}>
+              <span>{{.Name $.Lang}}</span>
+            </label>
+          {{end}}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="text-sm">{{ t "battle.edit.immune" }}</legend>
+        <div class="monster-trait-grid">
+          {{range .DamageTypes}}
+            <label class="flex items-center gap-1 text-xs">
+              <input type="checkbox" name="immune" value="{{.Slug}}" {{if $.EditGroup.HasImmune .Slug}}checked{{end}}>
+              <span>{{.Name $.Lang}}</span>
+            </label>
+          {{end}}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="text-sm">{{ t "battle.edit.vuln" }}</legend>
+        <div class="monster-trait-grid">
+          {{range .DamageTypes}}
+            <label class="flex items-center gap-1 text-xs">
+              <input type="checkbox" name="vuln" value="{{.Slug}}" {{if $.EditGroup.HasVuln .Slug}}checked{{end}}>
+              <span>{{.Name $.Lang}}</span>
+            </label>
+          {{end}}
+        </div>
+      </fieldset>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn-gold" type="submit">{{ t "common.apply" }}</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('monster-stats-modal').close()">{{ t "common.cancel" }}</button>
+      </div>
+    </form>
+  {{end}}
+</div>

@@ -466,6 +466,28 @@ func fightScore(v int) int {
 	return 10
 }
 
+// Condition is a PHB 2014 Appendix A condition (or a common combat overlay like burning).
+type Condition struct {
+	ID            int64
+	Slug          string
+	NameEN        string
+	NameRU        string
+	SourceURL     string
+	SourceURLRU   string
+	DamageFormula string
+	DamageType    string
+	IsPHB         bool
+}
+
+func (c Condition) Name(lang string) string { return Pick(lang, c.NameEN, c.NameRU) }
+
+func (c Condition) Source(lang string) string {
+	if c.SourceURLRU != "" {
+		return c.SourceURLRU
+	}
+	return c.SourceURL
+}
+
 func pickLevelMap(m map[string]string, level int) string {
 	if len(m) == 0 {
 		return ""
