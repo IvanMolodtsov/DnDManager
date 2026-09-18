@@ -24,4 +24,6 @@ var (
 	ErrSlotRequired       = errors.New("equipment slot required")
 	ErrAttunementFull     = errors.New("already attuned to three items")
 	ErrItemNotHeld        = errors.New("item is not on this character")
+	ErrAmount             = errors.New("amount must be at least 1")
+	ErrDamageType         = errors.New("damage type required")
 )

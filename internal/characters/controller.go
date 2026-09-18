@@ -44,8 +44,10 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("GET /characters/{id}/checks/save/{ability}", auth(http.HandlerFunc(c.saveCheckModal)))
 	mux.Handle("POST /characters/{id}/checks/skill/{slug}/roll", auth(http.HandlerFunc(c.rollSkillCheck)))
 	mux.Handle("POST /characters/{id}/checks/save/{ability}/roll", auth(http.HandlerFunc(c.rollSaveCheck)))
-	mux.Handle("POST /characters/{id}/combat/hp", auth(http.HandlerFunc(c.adjustHP)))
-	mux.Handle("POST /characters/{id}/combat/temp", auth(http.HandlerFunc(c.adjustTempHP)))
+	mux.Handle("GET /characters/{id}/vitals", auth(http.HandlerFunc(c.vitalsPartial)))
+	mux.Handle("GET /characters/{id}/events", auth(http.HandlerFunc(c.vitalsEvents)))
+	mux.Handle("GET /characters/{id}/combat/adjust", auth(http.HandlerFunc(c.hpAdjustModal)))
+	mux.Handle("POST /characters/{id}/combat/adjust", auth(http.HandlerFunc(c.applyHPAdjust)))
 	mux.Handle("POST /characters/{id}/combat/death", auth(http.HandlerFunc(c.toggleDeath)))
 	mux.Handle("POST /characters/{id}/effects/{effectID}/remove", auth(http.HandlerFunc(c.dismissEffect)))
 	mux.Handle("GET /characters/{id}/items/new", auth(http.HandlerFunc(c.newItemModal)))
@@ -99,24 +101,30 @@ func (c *Controller) list(w http.ResponseWriter, r *http.Request) {
 
 type showView struct {
 	platform.BaseView
-	Character      *Character
-	ReadOnly       bool
-	IsOwner        bool
-	IsDM           bool
-	ClassLine      string
-	ResourceGroups []ResourceGroup
-	Prepared       []SpellRow
-	Learned        []SpellRow
-	Skills         []SkillRow
-	Saves          []SaveRow
-	Combat         rules.CombatStats
-	OOBCombat      bool
-	Tab            string
-	Equipped       []ItemRow
-	Pack           []ItemRow
-	Consumables    []ItemRow
-	ConflictName   string
-	DefenseLine    string
+	Character        *Character
+	ReadOnly         bool
+	IsOwner          bool
+	IsDM             bool
+	ClassLine        string
+	ResourceGroups   []ResourceGroup
+	Prepared         []SpellRow
+	Learned          []SpellRow
+	Skills           []SkillRow
+	Saves            []SaveRow
+	Combat           rules.CombatStats
+	OOBCombat        bool
+	HPResult         *HPResult
+	AdjustPool       string
+	AdjustSign       string
+	AdjustAmount     int
+	AdjustDamageType string
+	DamageTypes      []rules.NamedOption
+	Tab              string
+	Equipped         []ItemRow
+	Pack             []ItemRow
+	Consumables      []ItemRow
+	ConflictName     string
+	DefenseLine      string
 }
 
 func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
@@ -146,12 +154,14 @@ func (c *Controller) sheetView(r *http.Request, ch *Character, readonly bool) sh
 	if tab != "learned" {
 		tab = "prepared"
 	}
+	u := platform.UserFrom(r.Context())
+	isOwner := ch.OwnerID == u.ID
 	return showView{
 		BaseView:       c.base(r, ch.Name),
 		Character:      ch,
-		ReadOnly:       readonly,
-		IsOwner:        ch.OwnerID == platform.UserFrom(r.Context()).ID,
-		IsDM:           readonly,
+		ReadOnly:       !isOwner,
+		IsOwner:        isOwner,
+		IsDM:           c.Svc.Campaigns.IsDM(ch.CampaignID, u.ID),
 		ClassLine:      ch.ClassLine(),
 		ResourceGroups: resourceGroups(ch.Resources),
 		Prepared:       spellRows(ch, true, platform.LangFrom(r.Context())),

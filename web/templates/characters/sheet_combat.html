@@ -6,18 +6,16 @@
       <span>{{ t "character.slot.hp" }}</span>
       <strong>{{.Combat.HPCurrent}}</strong>
       <em>/ {{.Combat.HPMax}}</em>
-      {{if $.IsOwner}}
+      {{if or $.IsOwner $.IsDM}}
         <div class="combat-step">
-          <form hx-post="/characters/{{$.Character.ID}}/combat/hp" hx-target="#sheet-vitals" hx-swap="outerHTML">
-            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
-            <input type="hidden" name="delta" value="-1">
-            <button class="ability-save-btn" type="submit">−</button>
-          </form>
-          <form hx-post="/characters/{{$.Character.ID}}/combat/hp" hx-target="#sheet-vitals" hx-swap="outerHTML">
-            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
-            <input type="hidden" name="delta" value="1">
-            <button class="ability-save-btn" type="submit">+</button>
-          </form>
+          <button type="button" class="ability-save-btn"
+                  hx-get="/characters/{{$.Character.ID}}/combat/adjust?pool=hp&amp;sign=-"
+                  hx-target="#hp-adjust-body" hx-swap="innerHTML"
+                  hx-on::after-request="document.getElementById('hp-adjust-modal').showModal()">−</button>
+          <button type="button" class="ability-save-btn"
+                  hx-get="/characters/{{$.Character.ID}}/combat/adjust?pool=hp&amp;sign=%2B"
+                  hx-target="#hp-adjust-body" hx-swap="innerHTML"
+                  hx-on::after-request="document.getElementById('hp-adjust-modal').showModal()">+</button>
         </div>
       {{end}}
     </div>
@@ -25,18 +23,16 @@
       <span>{{ t "character.combat.temphp" }}</span>
       <strong>{{.Combat.TempHP}}</strong>
       <em>{{ t "character.combat.temphp.stack" }}</em>
-      {{if $.IsOwner}}
+      {{if or $.IsOwner $.IsDM}}
         <div class="combat-step">
-          <form hx-post="/characters/{{$.Character.ID}}/combat/temp" hx-target="#sheet-vitals" hx-swap="outerHTML">
-            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
-            <input type="hidden" name="delta" value="-1">
-            <button class="ability-save-btn" type="submit">−</button>
-          </form>
-          <form hx-post="/characters/{{$.Character.ID}}/combat/temp" hx-target="#sheet-vitals" hx-swap="outerHTML">
-            <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
-            <input type="hidden" name="delta" value="1">
-            <button class="ability-save-btn" type="submit">+</button>
-          </form>
+          <button type="button" class="ability-save-btn"
+                  hx-get="/characters/{{$.Character.ID}}/combat/adjust?pool=temp&amp;sign=-"
+                  hx-target="#hp-adjust-body" hx-swap="innerHTML"
+                  hx-on::after-request="document.getElementById('hp-adjust-modal').showModal()">−</button>
+          <button type="button" class="ability-save-btn"
+                  hx-get="/characters/{{$.Character.ID}}/combat/adjust?pool=temp&amp;sign=%2B"
+                  hx-target="#hp-adjust-body" hx-swap="innerHTML"
+                  hx-on::after-request="document.getElementById('hp-adjust-modal').showModal()">+</button>
         </div>
       {{end}}
     </div>
@@ -60,7 +56,7 @@
         <span>{{ t "character.combat.death.success" }}</span>
         <div class="death-pips">
           {{range $i, $on := .Combat.SuccessPips}}
-            {{if $.IsOwner}}
+            {{if or $.IsOwner $.IsDM}}
               <form hx-post="/characters/{{$.Character.ID}}/combat/death" hx-target="#sheet-vitals" hx-swap="outerHTML">
                 <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
                 <input type="hidden" name="track" value="success">
@@ -77,7 +73,7 @@
         <span>{{ t "character.combat.death.fail" }}</span>
         <div class="death-pips">
           {{range $i, $on := .Combat.FailPips}}
-            {{if $.IsOwner}}
+            {{if or $.IsOwner $.IsDM}}
               <form hx-post="/characters/{{$.Character.ID}}/combat/death" hx-target="#sheet-vitals" hx-swap="outerHTML">
                 <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
                 <input type="hidden" name="track" value="fail">
@@ -92,6 +88,9 @@
       </div>
     </div>
   </div>
+  {{if .HPResult}}
+    <p class="hp-note mt-3">{{template "characters/hp_result.html" .}}</p>
+  {{end}}
   <p class="mt-3 text-xs text-parchment/50">{{ t "character.proficiency" }} +{{.Character.ProficiencyBonus}}</p>
   {{if .DefenseLine}}
     <p class="mt-2 text-sm text-gold">{{ t "character.combat.grants" }}: {{.DefenseLine}}</p>

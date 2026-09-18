@@ -17,7 +17,7 @@
           <span>{{if .DurationKey}}{{ t .DurationKey }}{{else}}—{{end}}</span>
           <span>{{ t (printf "character.status.source.%s" .Source) }}</span>
           <span>
-            {{if $.IsOwner}}
+            {{if or $.IsOwner $.IsDM}}
               <form hx-post="/characters/{{$.Character.ID}}/effects/{{.ID}}/remove" hx-target="#sheet-vitals" hx-swap="outerHTML">
                 <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
                 <button class="btn-ghost" type="submit">{{ t "common.remove" }}</button>

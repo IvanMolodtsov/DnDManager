@@ -53,6 +53,7 @@ func main() {
 		Campaigns: campSvc,
 		Catalog:   catalogSvc,
 		Rules:     &rules.Engine{Catalog: catalogSvc},
+		Events:    characters.NewVitalsHub(),
 	}
 
 	mux := http.NewServeMux()
