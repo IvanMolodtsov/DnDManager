@@ -1,0 +1,75 @@
+<label class="block text-sm mt-3">
+  <span>{{ t "character.status.search" }}</span>
+  <input id="status-search-q" class="input" type="search" name="q" value="{{.StatusQuery}}"
+         placeholder="{{ t "character.status.search.ph" }}"
+         hx-get="{{.StatusSearchURL}}"
+         hx-trigger="keyup changed delay:300ms, search"
+         hx-target="#status-search-results" hx-swap="innerHTML"
+         autocomplete="off">
+</label>
+<div id="status-search-results" class="mt-2">
+  {{template "characters/status_results.html" .}}
+</div>
+
+<form class="mt-4 space-y-3"
+      hx-post="{{.StatusPostURL}}"
+      hx-target="#status-add-body"
+      hx-swap="innerHTML">
+  <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+  {{if .StatusPick}}<input type="hidden" name="condition_id" value="{{.StatusPick.ID}}">{{end}}
+  <div class="grid gap-3 sm:grid-cols-2">
+    <label class="block text-sm">
+      <span>{{ t "character.status.name_en" }}</span>
+      <input class="input" type="text" name="name_en" value="{{if .StatusPick}}{{.StatusPick.NameEN}}{{end}}">
+    </label>
+    <label class="block text-sm">
+      <span>{{ t "character.status.name_ru" }}</span>
+      <input class="input" type="text" name="name_ru" value="{{if .StatusPick}}{{.StatusPick.NameRU}}{{end}}">
+    </label>
+  </div>
+  <label class="block text-sm">
+    <span>{{ t "character.status.link" }}</span>
+    <input class="input" type="url" name="source_url" placeholder="https://5e14.dnd.su/…"
+           value="{{if .StatusPick}}{{.StatusPick.Source $.Lang}}{{end}}">
+  </label>
+  <div class="grid gap-3 sm:grid-cols-2">
+    <label class="block text-sm">
+      <span>{{ t "character.status.damage_formula" }}</span>
+      <input class="input" type="text" name="damage_formula" placeholder="1d6"
+             value="{{if .StatusPick}}{{.StatusPick.DamageFormula}}{{end}}">
+    </label>
+    <label class="block text-sm">
+      <span>{{ t "character.status.damage_type" }}</span>
+      <select class="input" name="damage_type">
+        <option value="">{{ t "character.hp.damage_type.choose" }}</option>
+        {{$pick := .StatusPick}}
+        {{range .DamageTypes}}
+          <option value="{{.Slug}}"{{if $pick}}{{if eq .Slug $pick.DamageType}} selected{{end}}{{end}}>{{.Name $.Lang}}</option>
+        {{end}}
+      </select>
+    </label>
+  </div>
+  <div class="grid gap-3 sm:grid-cols-2">
+    <label class="block text-sm">
+      <span>{{ t "character.status.ac_bonus" }}</span>
+      <input class="input" type="number" name="ac_bonus" value="0">
+    </label>
+    <label class="block text-sm">
+      <span>{{ t "character.status.duration_turns" }}</span>
+      <input class="input" type="number" name="duration_turns" min="0" max="99" value="0">
+    </label>
+  </div>
+  <p class="text-xs text-parchment/50">{{ t "character.status.duration_turns.hint" }}</p>
+  <label class="status-check">
+    <input type="checkbox" name="remove_on_battle_end" value="1" {{if .DefaultRemoveEnd}}checked{{end}}>
+    <span>{{ t "character.status.remove_on_end" }}</span>
+  </label>
+  <label class="status-check">
+    <input type="checkbox" name="hidden" value="1">
+    <span>{{ t "character.status.hidden" }}</span>
+  </label>
+  <div class="flex flex-wrap gap-2">
+    <button class="btn-gold" type="submit">{{ t "battle.add" }}</button>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('status-add-modal').close()">{{ t "common.cancel" }}</button>
+  </div>
+</form>

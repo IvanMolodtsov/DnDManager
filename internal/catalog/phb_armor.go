@@ -6,15 +6,15 @@ const ArmorTableURL = "https://5e14.dnd.su/articles/inventory/95-armor-and-shiel
 
 // PHBArmorRow is one row of the PHB armor/shields table.
 type PHBArmorRow struct {
-	Slug           string
-	NameEN         string
-	NameRU         string
-	Category       string // light | medium | heavy | shield
-	ACBase         int
-	DexMax         int // -1 = unlimited DEX (light); 2 = medium cap; 0 = none
-	StealthDisadv  bool
-	StrMin         int
-	SuggestedSlot  string
+	Slug          string
+	NameEN        string
+	NameRU        string
+	Category      string // light | medium | heavy | shield
+	ACBase        int
+	DexMax        int // -1 = unlimited DEX (light); 2 = medium cap; 0 = none
+	StealthDisadv bool
+	StrMin        int
+	SuggestedSlot string
 }
 
 // PHBArmor is the PHB 2014 armor table (12 suits + shield).

@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"dndmanager/internal/battles"
 	"dndmanager/internal/campaigns"
 	"dndmanager/internal/catalog"
 	"dndmanager/internal/characters"
@@ -55,14 +56,23 @@ func main() {
 		Rules:     &rules.Engine{Catalog: catalogSvc},
 		Events:    characters.NewVitalsHub(),
 	}
+	battleSvc := &battles.Service{
+		Repo:       &battles.Repository{DB: db},
+		Campaigns:  campSvc,
+		Catalog:    catalogSvc,
+		Characters: charSvc,
+		Events:     battles.NewHub(),
+	}
+	charSvc.OnCampaign = battleSvc.Events.Broadcast
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
 	auth := platform.RequireAuth
 	(&users.Controller{Svc: userSvc, Sessions: sessions, Render: renderer}).Mount(mux)
-	(&campaigns.Controller{Svc: campSvc, Characters: charSvc, Render: renderer}).Mount(mux, auth)
+	(&campaigns.Controller{Svc: campSvc, Characters: charSvc, Battles: battleSvc, Render: renderer}).Mount(mux, auth)
 	(&characters.Controller{Svc: charSvc, Campaigns: campSvc, Catalog: catalogSvc, Render: renderer}).Mount(mux, auth)
+	(&battles.Controller{Svc: battleSvc, Campaigns: campSvc, Characters: charSvc, Catalog: catalogSvc, Render: renderer}).Mount(mux, auth)
 
 	home := &homeController{Users: userSvc, Campaigns: campSvc, Characters: charSvc, Render: renderer}
 	mux.HandleFunc("GET /{$}", home.index)

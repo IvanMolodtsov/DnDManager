@@ -1,0 +1,54 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">
+      {{if eq .AdjustPool "hp"}}
+        {{if eq .AdjustSign "-"}}{{ t "character.hp.damage.title" }}{{else}}{{ t "character.hp.heal.title" }}{{end}}
+      {{else}}
+        {{if eq .AdjustSign "-"}}{{ t "character.hp.temp_down.title" }}{{else}}{{ t "character.hp.temp_up.title" }}{{end}}
+      {{end}}
+    </h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('hp-adjust-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{if .AdjustUnit}}<p class="mt-1 text-sm text-parchment/70">{{.AdjustUnit.Name}}</p>{{end}}
+  {{template "error" .}}
+
+  {{if .HPResult}}
+    <p class="hp-note mt-3">{{template "characters/hp_result.html" .}}</p>
+    <p class="mt-4">
+      <button type="button" class="btn-gold" onclick="document.getElementById('hp-adjust-modal').close()">{{ t "common.close" }}</button>
+    </p>
+  {{else if .AdjustUnit}}
+    <form class="mt-4 space-y-3"
+          hx-post="/campaigns/{{.Campaign.ID}}/battle/units/{{.AdjustUnit.ID}}/adjust"
+          hx-target="#hp-adjust-body"
+          hx-swap="innerHTML">
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+      <input type="hidden" name="pool" value="{{.AdjustPool}}">
+      <input type="hidden" name="sign" value="{{.AdjustSign}}">
+      <label class="block text-sm">
+        <span>{{ t "character.hp.amount" }}</span>
+        <input class="input" type="number" name="amount" min="1" value="{{.AdjustAmount}}" required>
+      </label>
+      {{if and (eq .AdjustPool "hp") (eq .AdjustSign "-")}}
+        <label class="block text-sm">
+          <span>{{ t "character.hp.damage_type" }}</span>
+          <select class="input" name="damage_type" required>
+            <option value="">{{ t "character.hp.damage_type.choose" }}</option>
+            {{range .DamageTypes}}
+              <option value="{{.Slug}}" {{if eq .Slug $.AdjustDamageType}}selected{{end}}>{{.Name $.Lang}}</option>
+            {{end}}
+          </select>
+        </label>
+        <p class="text-xs text-parchment/50">{{ t "character.hp.damage.hint" }}</p>
+      {{else if and (eq .AdjustPool "hp") (eq .AdjustSign "+")}}
+        <p class="text-xs text-parchment/50">{{ t "character.hp.heal.hint" }}</p>
+      {{else}}
+        <p class="text-xs text-parchment/50">{{ t "character.hp.temp.hint" }}</p>
+      {{end}}
+      <div class="flex flex-wrap gap-2">
+        <button class="btn-gold" type="submit">{{ t "common.apply" }}</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('hp-adjust-modal').close()">{{ t "common.cancel" }}</button>
+      </div>
+    </form>
+  {{end}}
+</div>

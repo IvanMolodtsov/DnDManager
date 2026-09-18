@@ -1,0 +1,119 @@
+<section class="card">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "battle.round" }} {{.Battle.Round}}</h2>
+    {{if .IsDM}}
+      <div class="flex flex-wrap gap-2">
+        <form hx-post="/campaigns/{{.Campaign.ID}}/battle/next" hx-target="#battle-board" hx-swap="outerHTML">
+          <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+          <button class="btn-gold" type="submit">{{ t "battle.next" }}</button>
+        </form>
+        <form hx-post="/campaigns/{{.Campaign.ID}}/battle/end" hx-target="#battle-board" hx-swap="outerHTML">
+          <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+          <button class="btn-ghost" type="submit">{{ t "battle.end" }}</button>
+        </form>
+      </div>
+    {{end}}
+  </div>
+  <ul class="mt-4 space-y-2">
+    {{range .Battle.Units}}
+      {{$unit := .}}
+      {{$active := eq .SortOrder $.Battle.ActiveIndex}}
+      <li class="battle-row {{if $active}}active{{end}} {{if or .Dead .Escaped}}skip{{end}}">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-gold">{{.Initiative}}</span>
+            <strong>{{.Name}}</strong>
+            {{if $active}}<span class="inv-tag">{{ t "battle.active" }}</span>{{end}}
+            {{if .Escaped}}<span class="inv-tag">{{ t "battle.escape" }}</span>{{end}}
+            {{if .Dead}}<span class="inv-tag">{{ t "battle.dead" }}</span>{{end}}
+            {{if and .Knocked (not .Dead)}}<span class="inv-tag">{{ t "battle.knocked" }}</span>{{end}}
+            {{if .Stable}}<span class="inv-tag">{{ t "battle.stable" }}</span>{{end}}
+          </div>
+          <p class="mt-1 text-xs text-parchment/60">
+            {{if .IsPC}}
+              HP {{.HPCurrent}}/{{.HPMax}}{{if .TempHP}} · temp {{.TempHP}}{{end}}
+            {{else if $.IsDM}}
+              HP {{.HPCurrent}}/{{.HPMax}}{{if .TempHP}} · temp {{.TempHP}}{{end}} · AC {{.DisplayAC}}
+              {{if .IsMonster}} · {{.ScoreLine}}{{end}}
+              {{if .ResistLine}} · {{.ResistLine}}{{end}}
+              {{if and .IsMonster .ArticleURL}}
+                · <a class="text-gold hover:underline" href="{{.ArticleURL}}" target="_blank" rel="noopener">{{ t "battle.edit.article" }}</a>
+              {{end}}
+            {{else}}
+              {{ t "battle.hp.hidden" }}
+            {{end}}
+          </p>
+          {{$fx := .BoardEffects $.IsDM}}
+          {{if $fx}}
+            <p class="mt-1 flex flex-wrap items-center gap-1">
+              {{range $fx}}
+                <span class="inv-tag">
+                  {{if .SourceURL}}<a class="hover:underline" href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Name $.Lang}}</a>{{else}}{{.Name $.Lang}}{{end}}
+                  {{if .Hidden}} · {{ t "character.status.hidden.badge" }}{{end}}
+                  {{if gt .DurationTurns 0}} · {{.DurationTurns}}{{end}}
+                </span>
+                {{if $.IsDM}}
+                  <form hx-post="/campaigns/{{$.Campaign.ID}}/battle/units/{{$unit.ID}}/effects/{{.ID}}/remove"
+                        hx-target="#battle-board" hx-swap="outerHTML" style="display:inline">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                    <button class="btn-ghost" style="padding:.05rem .3rem;font-size:.65rem" type="submit">×</button>
+                  </form>
+                {{end}}
+              {{end}}
+            </p>
+          {{end}}
+          {{if .ShowDeathSaves}}
+            <div class="battle-death">
+              <p class="battle-death-label">{{ t "battle.death_saves" }}</p>
+              <div class="death-tracks">
+                <div>
+                  <span>{{ t "character.combat.death.success" }}</span>
+                  <div class="death-pips">
+                    {{range .SuccessPips}}
+                      <span class="death-pip {{if .}}on{{end}}"></span>
+                    {{end}}
+                  </div>
+                </div>
+                <div>
+                  <span>{{ t "character.combat.death.fail" }}</span>
+                  <div class="death-pips">
+                    {{range .FailPips}}
+                      <span class="death-pip fail {{if .}}on{{end}}"></span>
+                    {{end}}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {{end}}
+        </div>
+        {{if and $.IsDM (not .Escaped)}}
+          <div class="flex flex-wrap items-center gap-1">
+            {{if not .Dead}}
+              <button type="button" class="ability-save-btn"
+                      hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/adjust?pool=hp&amp;sign=-"
+                      hx-target="#hp-adjust-body" hx-swap="innerHTML">−</button>
+              <button type="button" class="ability-save-btn"
+                      hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/adjust?pool=hp&amp;sign=%2B"
+                      hx-target="#hp-adjust-body" hx-swap="innerHTML">+</button>
+            {{end}}
+            {{if and .IsPC .Knocked (not .Dead) $active (not .Stable)}}
+              <button type="button" class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem"
+                      hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/death-save"
+                      hx-target="#death-save-body" hx-swap="innerHTML">{{ t "battle.death_save" }}</button>
+            {{end}}
+            <button type="button" class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem"
+                    hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/effects/new"
+                    hx-target="#status-add-body" hx-swap="innerHTML">{{ t "character.status.add" }}</button>
+            {{if not .Dead}}
+              <form hx-post="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/escape"
+                    hx-target="#battle-board" hx-swap="outerHTML">
+                <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                <button class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem" type="submit">{{ t "battle.escape" }}</button>
+              </form>
+            {{end}}
+          </div>
+        {{end}}
+      </li>
+    {{end}}
+  </ul>
+</section>

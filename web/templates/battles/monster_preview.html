@@ -1,0 +1,17 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{.Preview.Name .Lang}}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('monster-preview-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-sm text-parchment/70">{{.Preview.Size}} {{.Preview.Type}} · {{.Preview.StatsLine}}</p>
+  {{if .Preview.IsStub}}<p class="mt-2 text-xs text-parchment/50">{{ t "battle.monster.stub.note" }}</p>{{end}}
+  {{if .Preview.Speed}}<p class="mt-1 text-xs text-parchment/50">{{.Preview.Speed}}</p>{{end}}
+  {{if .Preview.ResistLine}}<p class="mt-2 text-sm text-gold/80">{{.Preview.ResistLine}}</p>{{end}}
+  {{if .Preview.DescEN}}<p class="item-desc mt-3">{{.Preview.DescEN}}</p>{{end}}
+  {{$src := .Preview.Source5e14}}
+  {{if $src}}
+    <p class="mt-3 text-sm">
+      <a class="text-gold hover:underline" href="{{$src}}" target="_blank" rel="noopener">5e14</a>
+    </p>
+  {{end}}
+</div>
