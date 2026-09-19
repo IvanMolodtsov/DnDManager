@@ -1,0 +1,31 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "battle.death_save.title" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('death-save-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{if .DeathUnit}}<p class="mt-1 text-sm text-parchment/70">{{.DeathUnit.Name}}</p>{{end}}
+  <p class="mt-2 text-xs text-parchment/50">{{ t "battle.death_save.note" }}</p>
+  {{template "error" .}}
+  <p class="mt-3 font-mono text-gold">1d20</p>
+  {{if .RollResult}}
+    <p class="mt-1 text-sm">{{.RollResult.Total}}{{if .RollResult.Parts}} ({{range $i, $p := .RollResult.Parts}}{{if $i}} {{end}}{{$p}}{{end}}){{end}}</p>
+  {{end}}
+  {{if .DeathUnit}}
+    <form id="death-save-form" class="mt-4 space-y-3"
+          hx-post="/campaigns/{{.Campaign.ID}}/battle/units/{{.DeathUnit.ID}}/death-save"
+          hx-target="#battle-board" hx-swap="outerHTML"
+          hx-on::after-request="document.getElementById('death-save-modal').close()">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <label class="block text-sm">
+        <span>{{ t "character.spells.irl" }}</span>
+        <input class="input" type="number" name="roll" min="1" max="20" value="{{if .DeathRoll}}{{.DeathRoll}}{{else}}10{{end}}" required>
+      </label>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn-ghost" type="button"
+                hx-post="/campaigns/{{.Campaign.ID}}/battle/units/{{.DeathUnit.ID}}/death-save/roll"
+                hx-target="#death-save-body" hx-swap="innerHTML">{{ t "battle.roll" }}</button>
+        <button class="btn-gold" type="submit">{{ t "battle.death_save.record" }}</button>
+      </div>
+    </form>
+  {{end}}
+</div>

@@ -1,5 +1,12 @@
 <section class="card mb-6">
-  <h2 class="font-display text-xl text-gold">{{ t "character.status" }}</h2>
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 class="font-display text-xl text-gold">{{ t "character.status" }}</h2>
+    {{if .IsDM}}
+      <button type="button" class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem"
+              hx-get="/characters/{{.Character.ID}}/effects/new"
+              hx-target="#status-add-body" hx-swap="innerHTML">{{ t "character.status.add" }}</button>
+    {{end}}
+  </div>
   <p class="mt-1 text-xs text-parchment/50">{{ t "character.status.note" }}</p>
   {{if .Combat.Effects}}
     <div class="status-table mt-3">
@@ -12,12 +19,21 @@
       </div>
       {{range .Combat.Effects}}
         <div class="status-row">
-          <span>{{.Name $.Lang}}</span>
+          <span>
+            {{if .SourceURL}}
+              <a class="text-gold hover:underline" href="{{.SourceURL}}" target="_blank" rel="noopener">{{.Name $.Lang}}</a>
+            {{else}}
+              {{.Name $.Lang}}
+            {{end}}
+            {{if .Hidden}}<span class="inv-tag">{{ t "character.status.hidden.badge" }}</span>{{end}}
+          </span>
           <span class="font-mono text-gold">{{.Formula $.Lang}}</span>
-          <span>{{if .DurationKey}}{{ t .DurationKey }}{{else}}—{{end}}</span>
+          <span>
+            {{if gt .DurationTurns 0}}{{.DurationTurns}} {{ t "character.status.dur.turns" }}{{else if .DurationKey}}{{ t .DurationKey }}{{else}}—{{end}}
+          </span>
           <span>{{ t (printf "character.status.source.%s" .Source) }}</span>
           <span>
-            {{if or $.IsOwner $.IsDM}}
+            {{if or (and $.IsOwner (not .Hidden)) $.IsDM}}
               <form hx-post="/characters/{{$.Character.ID}}/effects/{{.ID}}/remove" hx-target="#sheet-vitals" hx-swap="outerHTML">
                 <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
                 <button class="btn-ghost" type="submit">{{ t "common.remove" }}</button>

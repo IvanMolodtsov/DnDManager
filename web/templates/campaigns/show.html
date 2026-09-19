@@ -5,6 +5,16 @@
   <p class="mt-1 text-sm text-parchment/70">
     {{if .IsDM}}{{ t "campaign.you.dm" }}{{else}}{{ t "campaign.you.player" }}{{end}}
   </p>
+  <div class="mt-3 flex flex-wrap gap-2">
+    {{if .HasBattle}}
+      <a class="btn-gold" href="/campaigns/{{.Campaign.ID}}/battle">{{ t "campaign.battle.open" }}</a>
+    {{else if .IsDM}}
+      <form method="post" action="/campaigns/{{.Campaign.ID}}/battle">
+        <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+        <button class="btn-gold" type="submit">{{ t "campaign.battle.start" }}</button>
+      </form>
+    {{end}}
+  </div>
 </div>
 
 <section class="card mb-6">

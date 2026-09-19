@@ -292,6 +292,165 @@ func TestSearchItemsAndSpellsCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestMonsterCatalogGoblinAndSearch(t *testing.T) {
+	dir := t.TempDir()
+	db, err := platform.OpenDB(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{Repo: &Repository{DB: db}}
+	monsters, err := svc.ListMonsters()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(monsters) < 300 {
+		t.Fatalf("monsters %d want >= 300", len(monsters))
+	}
+	stubs := 0
+	for _, m := range monsters {
+		if m.IsStub {
+			stubs++
+		}
+	}
+	if stubs < 1 {
+		t.Fatal("expected 5e14-only stubs such as spiderdragon")
+	}
+	gob, err := svc.MonsterBySlug("goblin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gob.HitPoints != 7 || gob.ArmorClass != 15 || gob.CRLabel != "1/4" || gob.Dexterity != 14 {
+		t.Fatalf("goblin %+v", gob)
+	}
+	if gob.SourceURLRU == "" || !strings.Contains(gob.SourceURLRU, "5e14.dnd.su/bestiary/") {
+		t.Fatalf("goblin 5e14 URL %s", gob.SourceURLRU)
+	}
+	ru, err := svc.SearchMonsters("ГОБЛИН", "", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, m := range ru {
+		if m.Slug == "goblin" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("Cyrillic goblin search: %+v", ru)
+	}
+	cr, err := svc.SearchMonsters("", "1/4", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, m := range cr {
+		if m.Slug == "goblin" {
+			found = true
+		}
+		if m.CRLabel != "1/4" {
+			t.Fatalf("CR filter leaked %s", m.CRLabel)
+		}
+	}
+	if !found {
+		t.Fatal("CR 1/4 should include goblin")
+	}
+	spider, err := svc.MonsterBySlug("spiderdragon")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !spider.IsStub || spider.HitPoints != 0 {
+		t.Fatalf("spiderdragon stub %+v", spider)
+	}
+	if spider.ID != 15712 {
+		t.Fatalf("spiderdragon id %d", spider.ID)
+	}
+	if spider.SourceURLRU != "https://5e14.dnd.su/bestiary/15712-spiderdragon/" {
+		t.Fatalf("spiderdragon URL %s", spider.SourceURLRU)
+	}
+	if spider.CRLabel != "11" {
+		t.Fatalf("spiderdragon CR %s", spider.CRLabel)
+	}
+	spSearch, err := svc.SearchMonsters("SPIDERDRAGON", "", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, m := range spSearch {
+		if m.Slug == "spiderdragon" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("Spiderdragon search: %+v", spSearch)
+	}
+	cr11, err := svc.SearchMonsters("spider", "11", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, m := range cr11 {
+		if m.Slug == "spiderdragon" {
+			found = true
+		}
+		if m.CRLabel != "11" {
+			t.Fatalf("CR 11 filter leaked %s", m.CRLabel)
+		}
+	}
+	if !found {
+		t.Fatal("CR 11 search should include spiderdragon")
+	}
+}
+
+func TestPHBConditionsSeed(t *testing.T) {
+	dir := t.TempDir()
+	db, err := platform.OpenDB(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{Repo: &Repository{DB: db}}
+	rows, err := svc.ListConditions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := PHBConditions()
+	if len(rows) != len(want) {
+		t.Fatalf("conditions %d want %d", len(rows), len(want))
+	}
+	bySlug := map[string]Condition{}
+	for _, c := range rows {
+		bySlug[c.Slug] = c
+	}
+	poison, ok := bySlug["poisoned"]
+	if !ok || poison.SourceURLRU != ConditionsTableURL {
+		t.Fatalf("poisoned 5e14 %+v", poison)
+	}
+	if poison.SourceURL != conditionAPIURL("poisoned") {
+		t.Fatalf("poisoned 5eapi %s", poison.SourceURL)
+	}
+	if strings.Contains(poison.SourceURLRU, "/condition/poisoned") {
+		t.Fatal("invented condition path")
+	}
+	burn, ok := bySlug["burning"]
+	if !ok || burn.IsPHB || burn.DamageFormula != "1d6" || burn.DamageType != "fire" {
+		t.Fatalf("burning %+v", burn)
+	}
+	if burn.SourceURLRU != "" {
+		t.Fatalf("burning must not invent a 5e14 path %s", burn.SourceURLRU)
+	}
+	ru, err := svc.SearchConditions("ОТРАВ", 10)
+	if err != nil || len(ru) == 0 || ru[0].Slug != "poisoned" {
+		t.Fatalf("unicode search %+v %v", ru, err)
+	}
+}
+
 func slugs(items []Item) []string {
 	out := make([]string, len(items))
 	for i, it := range items {

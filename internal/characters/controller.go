@@ -50,6 +50,9 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("POST /characters/{id}/combat/adjust", auth(http.HandlerFunc(c.applyHPAdjust)))
 	mux.Handle("POST /characters/{id}/combat/death", auth(http.HandlerFunc(c.toggleDeath)))
 	mux.Handle("POST /characters/{id}/effects/{effectID}/remove", auth(http.HandlerFunc(c.dismissEffect)))
+	mux.Handle("GET /characters/{id}/effects/new", auth(http.HandlerFunc(c.statusAddModal)))
+	mux.Handle("GET /characters/{id}/effects/search", auth(http.HandlerFunc(c.searchConditions)))
+	mux.Handle("POST /characters/{id}/effects", auth(http.HandlerFunc(c.addStatus)))
 	mux.Handle("GET /characters/{id}/items/new", auth(http.HandlerFunc(c.newItemModal)))
 	mux.Handle("GET /characters/{id}/items/weapons", auth(http.HandlerFunc(c.weaponBases)))
 	mux.Handle("GET /characters/{id}/items/weapons/search", auth(http.HandlerFunc(c.searchBaseWeapons)))
@@ -125,6 +128,13 @@ type showView struct {
 	Consumables      []ItemRow
 	ConflictName     string
 	DefenseLine      string
+	StatusQuery      string
+	StatusResults    []catalog.Condition
+	StatusPick       *catalog.Condition
+	DefaultRemoveEnd bool
+	StatusNewURL     string
+	StatusSearchURL  string
+	StatusPostURL    string
 }
 
 func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
@@ -168,13 +178,19 @@ func (c *Controller) sheetView(r *http.Request, ch *Character, readonly bool) sh
 		Learned:        spellRows(ch, false, platform.LangFrom(r.Context())),
 		Skills:         skillRows(ch, platform.LangFrom(r.Context())),
 		Saves:          saveRows(ch),
-		Combat:         rules.DeriveCombat(ch.CombatInput()),
+		Combat:         sheetCombat(ch, c.Svc.Campaigns.IsDM(ch.CampaignID, u.ID)),
 		DefenseLine:    ch.EquippedGrants().DefenseLine(),
 		Tab:            tab,
 		Equipped:       equippedRows(ch),
 		Pack:           packRows(ch),
 		Consumables:    consumableRows(ch),
 	}
+}
+
+func sheetCombat(ch *Character, isDM bool) rules.CombatStats {
+	st := rules.DeriveCombat(ch.CombatInput())
+	st.Effects = rules.VisibleEffects(ch.Effects, isDM)
+	return st
 }
 
 func (c *Controller) memberCampaign(w http.ResponseWriter, r *http.Request) (*campaigns.Campaign, bool) {

@@ -1,0 +1,32 @@
+<section class="card">
+  <h2 class="font-display text-xl text-gold">{{ t "battle.stats" }}</h2>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "battle.stats.note" }}</p>
+  <div class="mt-4 grid gap-4 md:grid-cols-2">
+    <div>
+      <h3 class="text-sm uppercase tracking-wide text-gold/80">{{ t "battle.stats.pcs" }}</h3>
+      <p class="mt-2 text-sm">{{ t "battle.stats.alive" }} {{.Stats.PCAlive}}</p>
+      <p class="text-sm">{{ t "battle.stats.dead" }} {{.Stats.PCDead}}</p>
+      <p class="text-sm">{{ t "battle.stats.escaped" }} {{.Stats.PCEscaped}}</p>
+    </div>
+    <div>
+      <h3 class="text-sm uppercase tracking-wide text-gold/80">{{ t "battle.stats.monsters" }}</h3>
+      <p class="mt-2 text-sm">{{ t "battle.stats.alive" }} {{.Stats.MonsterAlive}}</p>
+      <p class="text-sm">{{ t "battle.stats.dead" }} {{.Stats.MonsterDead}}</p>
+      <p class="text-sm">{{ t "battle.stats.escaped" }} {{.Stats.MonsterEscaped}}</p>
+    </div>
+  </div>
+  <ul class="mt-4 space-y-1 text-sm">
+    {{range .Stats.Units}}
+      <li class="{{if or .Dead .Escaped}}skip{{end}}">
+        {{.Name}}
+        {{if .Escaped}} — {{ t "battle.escape" }}{{else if .Dead}} — {{ t "battle.dead" }}{{else if .Knocked}} — {{ t "battle.knocked" }}{{else}} — {{ t "battle.stats.alive" }}{{end}}
+      </li>
+    {{end}}
+  </ul>
+  {{if .IsDM}}
+    <form class="mt-6" method="post" action="/campaigns/{{.Campaign.ID}}/battle/dismiss">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <button class="btn-gold" type="submit">{{ t "battle.dismiss" }}</button>
+    </form>
+  {{end}}
+</section>

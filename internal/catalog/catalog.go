@@ -4,7 +4,10 @@
 // link to the parent page when 5e14 has no dedicated URL.
 package catalog
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 const (
 	KindRace       = "race"
@@ -351,6 +354,138 @@ func (s Spell) StatsLine(slotLevel, charLevel int) string {
 		out += p
 	}
 	return out
+}
+
+// Monster is a fightable 5e 2014 stat block (HP/AC/CR/DEX + resist snapshot).
+// 5e14-only cards are stubs (IsStub): name + URL + CR/type from the index, no HP.
+type Monster struct {
+	ID                  int64
+	Slug                string
+	NameEN              string
+	NameRU              string
+	Size                string
+	Type                string
+	ArmorClass          int
+	HitPoints           int
+	HitDice             string
+	Speed               string
+	Dexterity           int
+	Strength            int
+	Constitution        int
+	Intelligence        int
+	Wisdom              int
+	Charisma            int
+	SaveProficiencies   []string
+	CR                  float64
+	CRLabel             string
+	XP                  int
+	Resistances         []string
+	Immunities          []string
+	Vulnerabilities     []string
+	ConditionImmunities []string
+	ActionsJSON         string
+	DescEN              string
+	SourceURL           string
+	SourceURLRU         string
+	IsStub              bool
+}
+
+func (m Monster) Name(lang string) string   { return Pick(lang, m.NameEN, m.NameRU) }
+func (m Monster) Source(lang string) string { return Pick(lang, m.SourceURL, m.SourceURLRU) }
+func (m Monster) Source5e14() string        { return m.SourceURLRU }
+
+// ArticleURL is the 5e14 bestiary page when present, else the 5eapi source_url.
+func (m Monster) ArticleURL() string {
+	if u := strings.TrimSpace(m.SourceURLRU); u != "" {
+		return u
+	}
+	return strings.TrimSpace(m.SourceURL)
+}
+
+func (m Monster) ResistLine() string {
+	var parts []string
+	if len(m.Resistances) > 0 {
+		parts = append(parts, "resist "+strings.Join(m.Resistances, ", "))
+	}
+	if len(m.Immunities) > 0 {
+		parts = append(parts, "immune "+strings.Join(m.Immunities, ", "))
+	}
+	if len(m.Vulnerabilities) > 0 {
+		parts = append(parts, "vuln "+strings.Join(m.Vulnerabilities, ", "))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func (m Monster) StatsLine() string {
+	if m.IsStub {
+		s := "stub"
+		if m.CRLabel != "" {
+			s = "CR " + m.CRLabel + " · " + s
+		}
+		if m.Type != "" {
+			s += " · " + m.Type
+		}
+		return s
+	}
+	s := fmt.Sprintf("CR %s · AC %d · HP %d", m.CRLabel, m.ArmorClass, m.HitPoints)
+	if m.HitDice != "" {
+		s += " (" + m.HitDice + ")"
+	}
+	return s
+}
+
+// FightHP is catalog HP, or 1 for stubs so the DM can add them and edit immediately.
+func (m Monster) FightHP() int {
+	if m.HitPoints > 0 {
+		return m.HitPoints
+	}
+	return 1
+}
+
+func (m Monster) FightAC() int {
+	if m.ArmorClass > 0 {
+		return m.ArmorClass
+	}
+	return 10
+}
+
+func (m Monster) FightDEX() int {
+	return fightScore(m.Dexterity)
+}
+
+func (m Monster) FightSTR() int { return fightScore(m.Strength) }
+func (m Monster) FightCON() int { return fightScore(m.Constitution) }
+func (m Monster) FightINT() int { return fightScore(m.Intelligence) }
+func (m Monster) FightWIS() int { return fightScore(m.Wisdom) }
+func (m Monster) FightCHA() int { return fightScore(m.Charisma) }
+
+func fightScore(v int) int {
+	if v > 0 {
+		return v
+	}
+	return 10
+}
+
+// Condition is a PHB 2014 Appendix A condition (or a common combat overlay like burning).
+type Condition struct {
+	ID            int64
+	Slug          string
+	NameEN        string
+	NameRU        string
+	SourceURL     string
+	SourceURLRU   string
+	DamageFormula string
+	DamageType    string
+	IsPHB         bool
+}
+
+func (c Condition) Name(lang string) string { return Pick(lang, c.NameEN, c.NameRU) }
+
+func (c Condition) Source(lang string) string {
+	if c.SourceURLRU != "" {
+		return c.SourceURLRU
+	}
+	return c.SourceURL
 }
 
 func pickLevelMap(m map[string]string, level int) string {

@@ -59,6 +59,10 @@
   <div id="hp-adjust-body"></div>
 </dialog>
 
+<dialog id="status-add-modal" class="sheet-dialog item-dialog">
+  <div id="status-add-body"></div>
+</dialog>
+
 {{template "characters/sheet_inventory.html" .}}
 
 <dialog id="item-add-modal" class="sheet-dialog item-dialog">
@@ -95,6 +99,10 @@
     }
     if (e.detail && e.detail.target && e.detail.target.id === 'hp-adjust-body') {
       var d = document.getElementById('hp-adjust-modal');
+      if (d) d.showModal();
+    }
+    if (e.detail && e.detail.target && e.detail.target.id === 'status-add-body') {
+      var d = document.getElementById('status-add-modal');
       if (d) d.showModal();
     }
   });

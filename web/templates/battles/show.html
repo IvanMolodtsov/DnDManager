@@ -1,0 +1,63 @@
+{{template "header" .}}
+<div class="mb-6">
+  <a class="text-sm text-gold/70 hover:text-gold" href="/campaigns/{{.Campaign.ID}}">{{ t "common.back" }}</a>
+  <h1 class="mt-2 font-display text-3xl text-gold">{{ t "battle.title" }}</h1>
+  <p class="mt-1 text-sm text-parchment/70">{{.Campaign.Name}}</p>
+  {{if not .IsDM}}
+    <p class="mt-2 text-xs text-parchment/50">{{ t "battle.player.note" }}</p>
+  {{end}}
+</div>
+
+{{template "battles/board.html" .}}
+
+<dialog id="hp-adjust-modal" class="sheet-dialog">
+  <div id="hp-adjust-body"></div>
+</dialog>
+<dialog id="monster-preview-modal" class="sheet-dialog item-dialog">
+  <div id="monster-preview-body"></div>
+</dialog>
+<dialog id="death-save-modal" class="sheet-dialog">
+  <div id="death-save-body"></div>
+</dialog>
+<dialog id="monster-stats-modal" class="sheet-dialog item-dialog">
+  <div id="monster-stats-body"></div>
+</dialog>
+<dialog id="status-add-modal" class="sheet-dialog item-dialog">
+  <div id="status-add-body"></div>
+</dialog>
+
+<script>
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    if (!e.detail || !e.detail.target) return;
+    if (e.detail.target.id === 'hp-adjust-body') {
+      var d = document.getElementById('hp-adjust-modal');
+      if (d) d.showModal();
+    }
+    if (e.detail.target.id === 'monster-preview-body') {
+      var d = document.getElementById('monster-preview-modal');
+      if (d) d.showModal();
+    }
+    if (e.detail.target.id === 'death-save-body') {
+      var d = document.getElementById('death-save-modal');
+      if (d) d.showModal();
+    }
+    if (e.detail.target.id === 'monster-stats-body') {
+      var d = document.getElementById('monster-stats-modal');
+      if (d) d.showModal();
+    }
+    if (e.detail.target.id === 'status-add-body') {
+      var d = document.getElementById('status-add-modal');
+      if (d) d.showModal();
+    }
+  });
+  (function () {
+    var id = {{.Campaign.ID}};
+    if (!id || typeof EventSource === 'undefined') return;
+    var es = new EventSource('/campaigns/' + id + '/battle/events');
+    es.addEventListener('battle', function () {
+      if (typeof htmx === 'undefined') return;
+      htmx.ajax('GET', '/campaigns/' + id + '/battle/board', {target: '#battle-board', swap: 'outerHTML'});
+    });
+  })();
+</script>
+{{template "footer" .}}

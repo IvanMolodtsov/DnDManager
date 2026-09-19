@@ -65,3 +65,15 @@
 .type-grid .btn-gold,.type-grid .btn-ghost{width:100%}
 .base-meta{font-size:.85rem;color:hsla(41,64%,87%,.75)}
 .hp-note{font-size:.875rem;color:#d4b45a}
+.battle-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;border:1px solid rgba(212,180,90,.15);border-radius:.35rem;padding:.65rem .75rem;background:rgba(20,16,12,.35)}
+.battle-row.active{border-color:rgba(212,180,90,.7);background:rgba(212,180,90,.12)}
+.battle-row.skip{opacity:.45}
+.battle-death{margin-top:.55rem;padding-top:.45rem;border-top:1px solid rgba(212,180,90,.32)}
+.battle-death-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:rgba(212,180,90,.85);margin-bottom:.3rem}
+.battle-death .death-tracks{gap:.9rem}
+.battle-death .death-pip{width:.9rem;height:.9rem}
+.monster-trait-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.25rem .75rem;margin-top:.35rem}
+@media (min-width:640px){.monster-trait-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.monster-trait-grid input{accent-color:#d4b45a}
+.status-check{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:hsla(41,64%,87%,.8)}
+.status-check input{accent-color:#d4b45a}
