@@ -1,0 +1,37 @@
+<section id="campaign-characters" class="card">
+  <div class="flex items-center justify-between gap-2">
+    <h2 class="font-display text-xl text-gold">{{ t "campaign.characters" }}</h2>
+    <a class="btn-gold" href="/campaigns/{{.Campaign.ID}}/characters/new">{{ t "character.new" }}</a>
+  </div>
+  {{template "error" .}}
+  {{if .Characters}}
+    <ul class="mt-3 space-y-2">
+      {{range .Characters}}
+        <li class="rounded border border-gold/15 px-3 py-2 text-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <a class="hover:text-gold" href="/characters/{{.ID}}">
+              <span>{{.Name}}</span>
+              {{if .Dead}}<span class="inv-tag">{{ t "character.dead" }}</span>{{end}}
+            </a>
+            <span class="text-parchment/60">{{.Owner}} · {{ t "character.level" }} {{.Level}}</span>
+          </div>
+          {{if $.IsDM}}
+            <div class="mt-2 flex flex-wrap gap-2">
+              {{if .Dead}}
+                <form hx-post="/campaigns/{{$.Campaign.ID}}/characters/{{.ID}}/revive">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                  <button class="btn-gold" type="submit" {{if lt $.Campaign.Souls 5000}}disabled{{end}}>{{ t "character.revive" }}</button>
+                </form>
+              {{end}}
+              <button type="button" class="btn-ghost"
+                      hx-get="/campaigns/{{$.Campaign.ID}}/characters/{{.ID}}/mutations/new"
+                      hx-target="#mutation-body" hx-swap="innerHTML">{{ t "character.mutation.add" }}</button>
+            </div>
+          {{end}}
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="mt-3 text-sm text-parchment/60">{{ t "campaign.empty.characters" }}</p>
+  {{end}}
+</section>

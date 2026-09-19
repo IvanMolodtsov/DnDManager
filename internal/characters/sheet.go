@@ -130,6 +130,7 @@ func spellRows(ch *Character, preparedOnly bool, lang string) []SpellRow {
 type SkillRow struct {
 	Slug       string
 	Name       string
+	NameEN     string
 	Ability    string
 	Bonus      int
 	Proficient bool
@@ -149,14 +150,14 @@ type SaveRow struct {
 }
 
 func skillRows(ch *Character, lang string) []SkillRow {
-	grants := ch.EquippedGrants()
+	grants := ch.AllGrants()
 	out := make([]SkillRow, 0, len(rules.Skills))
 	for _, sk := range rules.Skills {
 		m := ch.EffectiveSkillMark(sk.Slug)
-		b := rules.SkillBonus(ch.Scores(), ch.Level, m)
+		b := ch.SkillCheckBonus(sk.Slug)
 		fromItem := grants.HasSkill(sk.Slug)
 		out = append(out, SkillRow{
-			Slug: sk.Slug, Name: catalog.Pick(lang, sk.NameEN, sk.NameRU), Ability: sk.Ability, Bonus: b,
+			Slug: sk.Slug, Name: catalog.Pick(lang, sk.NameEN, sk.NameRU), NameEN: sk.NameEN, Ability: sk.Ability, Bonus: b,
 			Proficient: m.Proficient, Expertise: m.Expertise, FromItem: fromItem,
 			Formula: rules.CheckFormula(b), SourceURL: sk.SourceURL,
 		})

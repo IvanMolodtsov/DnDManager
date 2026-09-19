@@ -41,6 +41,7 @@ const (
 	StatConditionImmunity = "condition_immunity"
 	StatGrantCantrip      = "grant_cantrip"
 	StatGrantSpell        = "grant_spell"
+	StatGrantCompanion    = "grant_companion"
 	StatAbilityBonus      = "ability_bonus"
 	StatAbilityPenalty    = "ability_penalty"
 )

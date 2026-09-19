@@ -1,0 +1,21 @@
+{{if .LootResults}}
+  <ul class="spell-list mt-3">
+    {{range .LootResults}}
+      <li class="spell-row">
+        <div>
+          <span class="text-gold">{{.Name $.Lang}}</span>
+          <p class="text-xs text-parchment/60">
+            {{.Kind}}{{if .Rarity}} · {{.Rarity}}{{end}}{{$stats := .StatsLine}}{{if $stats}} · {{$stats}}{{end}}
+          </p>
+        </div>
+        <button class="btn-gold" type="button"
+                hx-get="/campaigns/{{$.Campaign.ID}}/battle/loot/items/{{.ID}}/preview"
+                hx-target="#loot-add-body" hx-swap="innerHTML">
+          {{ t "common.next" }}
+        </button>
+      </li>
+    {{end}}
+  </ul>
+{{else if .LootQuery}}
+  <p class="mt-3 text-sm text-parchment/45">{{ t "character.inventory.search.empty" }}</p>
+{{end}}

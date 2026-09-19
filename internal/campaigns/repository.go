@@ -41,13 +41,13 @@ func (r *Repository) Create(name, invite string, createdBy int64) (int64, error)
 
 func (r *Repository) FindByID(id int64) (*Campaign, error) {
 	return scanCampaign(r.DB.QueryRow(
-		`SELECT id, name, invite_code, created_by, created_at FROM campaigns WHERE id = ?`, id,
+		`SELECT id, name, invite_code, created_by, created_at, souls, souls_cap FROM campaigns WHERE id = ?`, id,
 	))
 }
 
 func (r *Repository) FindByInvite(code string) (*Campaign, error) {
 	return scanCampaign(r.DB.QueryRow(
-		`SELECT id, name, invite_code, created_by, created_at FROM campaigns WHERE invite_code = ?`, code,
+		`SELECT id, name, invite_code, created_by, created_at, souls, souls_cap FROM campaigns WHERE invite_code = ?`, code,
 	))
 }
 
@@ -59,7 +59,7 @@ func (r *Repository) InviteExists(code string) (bool, error) {
 
 func (r *Repository) ListForUser(userID int64) ([]CampaignListItem, error) {
 	rows, err := r.DB.Query(`
-		SELECT c.id, c.name, c.invite_code, c.created_by, c.created_at, m.role
+		SELECT c.id, c.name, c.invite_code, c.created_by, c.created_at, c.souls, c.souls_cap, m.role
 		FROM campaigns c
 		JOIN campaign_members m ON m.campaign_id = c.id
 		WHERE m.user_id = ?
@@ -72,7 +72,7 @@ func (r *Repository) ListForUser(userID int64) ([]CampaignListItem, error) {
 	for rows.Next() {
 		var item CampaignListItem
 		var created string
-		if err := rows.Scan(&item.ID, &item.Name, &item.InviteCode, &item.CreatedBy, &created, &item.MemberRole); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.InviteCode, &item.CreatedBy, &created, &item.Souls, &item.SoulsCap, &item.MemberRole); err != nil {
 			return nil, err
 		}
 		item.CreatedAt = parseTime(created)
@@ -123,13 +123,21 @@ func (r *Repository) Members(campaignID int64) ([]Membership, error) {
 	return out, rows.Err()
 }
 
+func (r *Repository) UpdateSouls(id int64, souls, cap int) error {
+	_, err := r.DB.Exec(`UPDATE campaigns SET souls = ?, souls_cap = ? WHERE id = ?`, souls, cap, id)
+	return err
+}
+
 func scanCampaign(row *sql.Row) (*Campaign, error) {
 	c := &Campaign{}
 	var created string
-	if err := row.Scan(&c.ID, &c.Name, &c.InviteCode, &c.CreatedBy, &created); err != nil {
+	if err := row.Scan(&c.ID, &c.Name, &c.InviteCode, &c.CreatedBy, &created, &c.Souls, &c.SoulsCap); err != nil {
 		return nil, err
 	}
 	c.CreatedAt = parseTime(created)
+	if c.SoulsCap < 1 {
+		c.SoulsCap = DefaultSoulsCap
+	}
 	return c, nil
 }
 

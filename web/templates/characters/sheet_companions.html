@@ -1,0 +1,135 @@
+<section id="sheet-companions" class="card mt-6">
+  <h3 class="font-display text-gold">{{ t "character.companions" }}</h3>
+  {{template "error" .}}
+  {{if .Character.Companions}}
+    <ul class="mt-3 space-y-2">
+      {{range .Character.Companions}}
+        <li class="rounded border border-gold/15 px-3 py-2 text-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <strong class="text-parchment">{{.DisplayName $.Lang}}</strong>
+              <span class="ml-1 text-xs text-parchment/50">{{ t (printf "character.companion.kind.%s" .Kind) }} · HP {{.HPCurrent}}/{{.HPMax}} · AC {{.AC}}</span>
+              {{if not .CanAttack}}<span class="inv-tag">{{ t "character.companion.no_attack" }}</span>{{end}}
+              {{$src := .ArticleURL}}
+              {{if $src}}
+                <a class="ml-1 text-xs text-gold hover:underline" href="{{$src}}" target="_blank" rel="noopener">{{ t "battle.edit.article" }}</a>
+              {{end}}
+            </div>
+            {{if $.IsOwner}}
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" class="btn-ghost"
+                        hx-get="/characters/{{$.Character.ID}}/companions/{{.ID}}/edit"
+                        hx-target="#companion-edit-body" hx-swap="innerHTML">{{ t "common.edit" }}</button>
+                <form hx-post="/characters/{{$.Character.ID}}/companions/{{.ID}}/remove"
+                      hx-target="#sheet-companions" hx-swap="outerHTML">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                  <button class="btn-ghost" type="submit">{{ t "common.remove" }}</button>
+                </form>
+              </div>
+            {{end}}
+          </div>
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="mt-2 text-sm text-parchment/45">{{ t "character.companions.empty" }}</p>
+  {{end}}
+
+  {{if and .IsOwner .CompanionGate.AnyPersist}}
+    <div class="mt-4 space-y-3">
+      <p class="text-xs text-parchment/50">{{ t "character.companions.add.note" }}</p>
+      {{if .CompanionGate.BeastMaster}}
+        <details class="rounded border border-gold/15 px-3 py-2" {{if eq .CompanionKind "beast"}}open{{end}}>
+          <summary class="cursor-pointer text-sm text-gold">{{ t "character.companion.kind.beast" }}</summary>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <label class="block text-sm">
+              <span>{{ t "battle.search" }}</span>
+              <input id="companion-q-beast" class="input" type="search" name="q" value="{{if eq .CompanionKind "beast"}}{{.CompanionQuery}}{{end}}"
+                     placeholder="{{ t "character.companion.search.beast" }}"
+                     hx-get="/characters/{{.Character.ID}}/companions/search"
+                     hx-vals='{"kind":"beast"}'
+                     hx-trigger="keyup changed delay:300ms, search"
+                     hx-target="#companion-results-beast" hx-swap="innerHTML" autocomplete="off">
+            </label>
+          </div>
+          <div id="companion-results-beast" class="mt-2">{{if eq .CompanionKind "beast"}}{{template "characters/companion_results.html" .}}{{end}}</div>
+        </details>
+      {{end}}
+      {{if .CompanionGate.Familiar}}
+        <details class="rounded border border-gold/15 px-3 py-2" {{if eq .CompanionKind "familiar"}}open{{end}}>
+          <summary class="cursor-pointer text-sm text-gold">{{ t "character.companion.kind.familiar" }}</summary>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <label class="block text-sm">
+              <span>{{ t "battle.search" }}</span>
+              <input id="companion-q-familiar" class="input" type="search" name="q" value="{{if eq .CompanionKind "familiar"}}{{.CompanionQuery}}{{end}}"
+                     placeholder="{{ t "character.companion.search.familiar" }}"
+                     hx-get="/characters/{{.Character.ID}}/companions/search"
+                     hx-vals='{"kind":"familiar"}'
+                     hx-trigger="keyup changed delay:300ms, search"
+                     hx-target="#companion-results-familiar" hx-swap="innerHTML" autocomplete="off">
+            </label>
+          </div>
+          <div id="companion-results-familiar" class="mt-2">{{if eq .CompanionKind "familiar"}}{{template "characters/companion_results.html" .}}{{end}}</div>
+        </details>
+      {{end}}
+      {{if .CompanionGate.Item}}
+        <details class="rounded border border-gold/15 px-3 py-2" {{if eq .CompanionKind "item"}}open{{end}}>
+          <summary class="cursor-pointer text-sm text-gold">{{ t "character.companion.kind.item" }}</summary>
+          <div class="mt-3 grid gap-3 sm:grid-cols-3">
+            <label class="block text-sm">
+              <span>{{ t "battle.search" }}</span>
+              <input id="companion-q-item" class="input" type="search" name="q" value="{{if eq .CompanionKind "item"}}{{.CompanionQuery}}{{end}}"
+                     placeholder="{{ t "character.companion.search.item" }}"
+                     hx-get="/characters/{{.Character.ID}}/companions/search"
+                     hx-vals='{"kind":"item"}'
+                     hx-include="#companion-cr-item,#companion-type-item"
+                     hx-trigger="keyup changed delay:300ms, search"
+                     hx-target="#companion-results-item" hx-swap="innerHTML" autocomplete="off">
+            </label>
+            <label class="block text-sm">
+              <span>{{ t "battle.cr" }}</span>
+              <select id="companion-cr-item" class="input" name="cr"
+                      hx-get="/characters/{{.Character.ID}}/companions/search"
+                      hx-vals='{"kind":"item"}'
+                      hx-include="#companion-q-item,#companion-type-item"
+                      hx-target="#companion-results-item" hx-swap="innerHTML">
+                <option value="">{{ t "battle.cr.any" }}</option>
+                {{range .CompanionCRs}}<option value="{{.}}" {{if and (eq $.CompanionKind "item") (eq . $.CompanionCR)}}selected{{end}}>{{.}}</option>{{end}}
+              </select>
+            </label>
+            <label class="block text-sm">
+              <span>{{ t "battle.type" }}</span>
+              <select id="companion-type-item" class="input" name="type"
+                      hx-get="/characters/{{.Character.ID}}/companions/search"
+                      hx-vals='{"kind":"item"}'
+                      hx-include="#companion-q-item,#companion-cr-item"
+                      hx-target="#companion-results-item" hx-swap="innerHTML">
+                <option value="">{{ t "battle.type.any" }}</option>
+                {{range .CompanionTypes}}<option value="{{.Slug}}" {{if and (eq $.CompanionKind "item") (eq .Slug $.CompanionType)}}selected{{end}}>{{.Name $.Lang}}</option>{{end}}
+              </select>
+            </label>
+          </div>
+          <div id="companion-results-item" class="mt-2">{{if eq .CompanionKind "item"}}{{template "characters/companion_results.html" .}}{{end}}</div>
+        </details>
+      {{end}}
+      {{if .CompanionGate.Weapon}}
+        <details class="rounded border border-gold/15 px-3 py-2">
+          <summary class="cursor-pointer text-sm text-gold">{{ t "character.companion.kind.weapon" }}</summary>
+          <form class="mt-3 space-y-2" hx-post="/characters/{{.Character.ID}}/companions" hx-target="#sheet-companions" hx-swap="outerHTML">
+            <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+            <input type="hidden" name="kind" value="weapon">
+            <label class="block text-sm">
+              <span>{{ t "character.companion.name" }}</span>
+              <input class="input" name="name" placeholder="{{ t "character.companion.weapon.ph" }}">
+            </label>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <label class="block text-sm"><span>{{ t "battle.hp.max" }}</span><input class="input" type="number" name="hp_max" min="1" max="999" value="20"></label>
+              <label class="block text-sm"><span>{{ t "battle.ac" }}</span><input class="input" type="number" name="ac" min="0" max="40" value="14"></label>
+            </div>
+            <button class="btn-gold" type="submit">{{ t "character.companion.add.blank" }}</button>
+          </form>
+        </details>
+      {{end}}
+    </div>
+  {{end}}
+</section>

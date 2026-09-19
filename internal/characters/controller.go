@@ -76,6 +76,19 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("POST /characters/{id}/items/{invID}/qty", auth(http.HandlerFunc(c.qtyItem)))
 	mux.Handle("POST /characters/{id}/items/{invID}/use", auth(http.HandlerFunc(c.useItem)))
 	mux.Handle("POST /characters/{id}/items/{invID}/remove", auth(http.HandlerFunc(c.removeItem)))
+	mux.Handle("GET /characters/{id}/companions", auth(http.HandlerFunc(c.companionsIsland)))
+	mux.Handle("GET /characters/{id}/companions/search", auth(http.HandlerFunc(c.searchCompanions)))
+	mux.Handle("POST /characters/{id}/companions", auth(http.HandlerFunc(c.addCompanion)))
+	mux.Handle("GET /characters/{id}/companions/{cid}/edit", auth(http.HandlerFunc(c.editCompanion)))
+	mux.Handle("POST /characters/{id}/companions/{cid}/edit", auth(http.HandlerFunc(c.saveCompanion)))
+	mux.Handle("POST /characters/{id}/companions/{cid}/remove", auth(http.HandlerFunc(c.removeCompanion)))
+	mux.Handle("GET /characters/{id}/inventory", auth(http.HandlerFunc(c.inventoryPartial)))
+	mux.Handle("GET /characters/{id}/gold/adjust", auth(http.HandlerFunc(c.goldAdjustModal)))
+	mux.Handle("POST /characters/{id}/gold", auth(http.HandlerFunc(c.applyGold)))
+	mux.Handle("GET /characters/{id}/souls/adjust", auth(http.HandlerFunc(c.soulsAdjustModal)))
+	mux.Handle("GET /characters/{id}/souls/cap", auth(http.HandlerFunc(c.soulsCapModal)))
+	mux.Handle("POST /characters/{id}/souls", auth(http.HandlerFunc(c.applySouls)))
+	c.MountMutations(mux, auth)
 }
 
 func (c *Controller) base(r *http.Request, title string) platform.BaseView {
@@ -116,6 +129,13 @@ type showView struct {
 	Saves            []SaveRow
 	Combat           rules.CombatStats
 	OOBCombat        bool
+	OOBInventory     bool
+	WearSlots        []string
+	CreatureSizes    []string
+	BodyParts        []string
+	Conditions       []rules.NamedOption
+	Slots            []string
+	Sizes            []string
 	HPResult         *HPResult
 	AdjustPool       string
 	AdjustSign       string
@@ -135,6 +155,16 @@ type showView struct {
 	StatusNewURL     string
 	StatusSearchURL  string
 	StatusPostURL    string
+	CompanionGate    CompanionGate
+	CompanionKind    string
+	CompanionQuery   string
+	CompanionCR      string
+	CompanionType    string
+	CompanionHits    []catalog.Monster
+	CompanionCRs     []string
+	CompanionTypes   []catalog.MonsterTypeOption
+	EditCompanion    *Companion
+	AbilityKeys      []string
 }
 
 func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +196,7 @@ func (c *Controller) sheetView(r *http.Request, ch *Character, readonly bool) sh
 	}
 	u := platform.UserFrom(r.Context())
 	isOwner := ch.OwnerID == u.ID
-	return showView{
+	v := showView{
 		BaseView:       c.base(r, ch.Name),
 		Character:      ch,
 		ReadOnly:       !isOwner,
@@ -179,12 +209,23 @@ func (c *Controller) sheetView(r *http.Request, ch *Character, readonly bool) sh
 		Skills:         skillRows(ch, platform.LangFrom(r.Context())),
 		Saves:          saveRows(ch),
 		Combat:         sheetCombat(ch, c.Svc.Campaigns.IsDM(ch.CampaignID, u.ID)),
-		DefenseLine:    ch.EquippedGrants().DefenseLine(),
+		DefenseLine:    ch.AllGrants().DefenseLine(),
 		Tab:            tab,
 		Equipped:       equippedRows(ch),
 		Pack:           packRows(ch),
 		Consumables:    consumableRows(ch),
+		CompanionGate:  GateCompanions(ch),
+		AbilityKeys:    rules.AbilityKeys,
+		WearSlots:      rules.WearSlots,
+		CreatureSizes:  rules.CreatureSizes,
+		Slots:          rules.WearSlots,
+		Sizes:          rules.CreatureSizes,
+		BodyParts:      rules.BodyParts,
+		Conditions:     rules.Conditions(),
+		DamageTypes:    rules.DamageTypes(),
 	}
+	c.fillCompanionFilters(&v)
+	return v
 }
 
 func sheetCombat(ch *Character, isDM bool) rules.CombatStats {
