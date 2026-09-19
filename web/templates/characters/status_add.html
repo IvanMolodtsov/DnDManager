@@ -1,0 +1,8 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "character.status.add" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('status-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{template "error" .}}
+  {{template "characters/status_form.html" .}}
+</div>

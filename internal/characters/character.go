@@ -99,7 +99,7 @@ func (c *Character) CombatInput() rules.CombatInput {
 	return rules.CombatInput{
 		Scores: c.Scores(), Classes: c.ClassRules(), RaceSpeed: speed,
 		HPCurrent: c.HPCurrent, HPMax: c.HPMax, TempHP: c.HPTemp,
-		DeathSuccess: c.DeathSuccess, DeathFail: c.DeathFail, Effects: c.Effects,
+		DeathSuccess: c.DeathSuccess, DeathFail: c.DeathFail, Effects: rules.DeriveEffects(c.Effects),
 		Gear: c.EquippedGear(),
 	}
 }

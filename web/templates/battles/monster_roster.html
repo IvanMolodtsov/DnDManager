@@ -1,0 +1,35 @@
+<div id="monster-roster">
+  <h3 class="mt-6 text-sm uppercase tracking-wide text-gold/80">{{ t "battle.added" }}</h3>
+  {{if .Groups}}
+    <ul class="mt-2 space-y-2">
+      {{range .Groups}}
+        <li class="flex items-center justify-between gap-2 rounded border border-gold/15 px-3 py-2 text-sm">
+          <span>
+            {{.Name}} × {{.Count}}{{if and $.IsDM .CRLabel}} · CR {{.CRLabel}}{{end}}
+            {{if $.IsDM}} · HP {{.HPCurrent}}/{{.HPMax}} · AC {{.AC}} · DEX {{.DEX}}{{end}}
+          </span>
+          {{if $.IsDM}}
+            <div class="flex flex-wrap items-center gap-1">
+              <button type="button" class="btn-ghost"
+                      hx-get="/campaigns/{{$.Campaign.ID}}/battle/monsters/{{.CatalogID}}/edit"
+                      hx-target="#monster-stats-body" hx-swap="innerHTML">{{ t "common.edit" }}</button>
+              <form hx-post="/campaigns/{{$.Campaign.ID}}/battle/monsters/{{.CatalogID}}/remove"
+                    hx-target="#monster-roster" hx-swap="outerHTML">
+                <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                <button class="btn-ghost" type="submit">{{ t "common.remove" }}</button>
+              </form>
+            </div>
+          {{end}}
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="mt-2 text-sm text-parchment/50">{{ t "battle.added.empty" }}</p>
+  {{end}}
+  {{if .IsDM}}
+    <form class="mt-4" hx-post="/campaigns/{{.Campaign.ID}}/battle/initiative" hx-target="#battle-board" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <button class="btn-gold" type="submit">{{ t "battle.continue.init" }}</button>
+    </form>
+  {{end}}
+</div>

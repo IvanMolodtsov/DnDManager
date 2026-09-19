@@ -41,6 +41,21 @@ func FormTrim(r *http.Request, name string) string {
 	return strings.TrimSpace(r.FormValue(name))
 }
 
+func FormList(r *http.Request, name string) []string {
+	if err := r.ParseForm(); err != nil {
+		return nil
+	}
+	raw := r.Form[name]
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
 func SafeReturn(r *http.Request, fallback string) string {
 	ret := r.FormValue("return")
 	if ret == "" {

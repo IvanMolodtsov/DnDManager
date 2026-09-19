@@ -17,15 +17,17 @@ var (
 	ErrNotFound     = errors.New("character not found")
 	ErrForbidden    = errors.New("forbidden")
 	ErrNotOwner     = errors.New("not character owner")
+	ErrStatusName   = errors.New("status name required")
 )
 
 // Service hydrates sheets, persists drafts, and applies confirmed progression.
 type Service struct {
-	Repo      *Repository
-	Campaigns *campaigns.Service
-	Catalog   *catalog.Service
-	Rules     *rules.Engine
-	Events    *VitalsHub
+	Repo       *Repository
+	Campaigns  *campaigns.Service
+	Catalog    *catalog.Service
+	Rules      *rules.Engine
+	Events     *VitalsHub
+	OnCampaign func(campaignID int64)
 }
 
 func (s *Service) Get(id int64) (*Character, error) {
@@ -72,6 +74,23 @@ func (s *Service) ListByCampaign(campaignID int64) ([]campaigns.CharacterSummary
 	return out, nil
 }
 
+func (s *Service) ListLiveByCampaign(campaignID int64) ([]*Character, error) {
+	list, err := s.Repo.ListByCampaign(campaignID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*Character, 0, len(list))
+	for i := range list {
+		ch := list[i]
+		if err := s.hydrate(&ch); err != nil {
+			return nil, err
+		}
+		cp := ch
+		out = append(out, &cp)
+	}
+	return out, nil
+}
+
 // CanView allows the owner (editable) or the campaign DM (combat-only mutations).
 func (s *Service) CanView(ch *Character, userID int64) (readonly bool, err error) {
 	if ch.OwnerID == userID {
@@ -95,6 +114,13 @@ func (s *Service) RequireCombatEdit(ch *Character, userID int64) error {
 	if ch.OwnerID == userID {
 		return nil
 	}
+	if s.Campaigns.IsDM(ch.CampaignID, userID) {
+		return nil
+	}
+	return ErrForbidden
+}
+
+func (s *Service) RequireDM(ch *Character, userID int64) error {
 	if s.Campaigns.IsDM(ch.CampaignID, userID) {
 		return nil
 	}
@@ -531,6 +557,8 @@ func ErrorKey(err error) string {
 		return "error.hp.amount"
 	case errors.Is(err, rules.ErrDamageType):
 		return "error.hp.damage_type"
+	case errors.Is(err, ErrStatusName):
+		return "error.status.name"
 	default:
 		return "error.generic"
 	}
@@ -1188,7 +1216,10 @@ func (s *Service) saveVitals(ch *Character) error {
 	if ch.HPCurrent > 0 {
 		ch.DeathSuccess, ch.DeathFail = 0, 0
 	}
-	return s.persistVitals(ch)
+	if err := s.persistVitals(ch); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Service) persistVitals(ch *Character) error {
@@ -1196,7 +1227,15 @@ func (s *Service) persistVitals(ch *Character) error {
 		return err
 	}
 	s.broadcastVitals(ch.ID)
+	s.notifyCampaign(ch)
 	return nil
+}
+
+func (s *Service) notifyCampaign(ch *Character) {
+	if s == nil || s.OnCampaign == nil || ch == nil || ch.CampaignID == 0 {
+		return
+	}
+	s.OnCampaign(ch.CampaignID)
 }
 
 func (s *Service) ApplyHPDamage(ch *Character, userID int64, amount int, dmgType string) (rules.DamageResult, error) {
@@ -1209,10 +1248,20 @@ func (s *Service) ApplyHPDamage(ch *Character, userID int64, amount int, dmgType
 	if !rules.ValidDamageType(dmgType) {
 		return rules.DamageResult{}, rules.ErrDamageType
 	}
-	res := rules.ApplyDamage(ch.HPCurrent, ch.HPMax, ch.Effects, ch.EquippedGrants(), amount, dmgType)
+	atZero := ch.HPCurrent == 0
+	visible := rules.DeriveEffects(ch.Effects)
+	hidden := rules.HiddenEffects(ch.Effects)
+	res := rules.ApplyDamage(ch.HPCurrent, ch.HPMax, visible, ch.EquippedGrants(), amount, dmgType)
 	ch.HPCurrent = res.NewHP
-	if res.AbsorbedTemp > 0 || len(res.NewEffects) != len(ch.Effects) {
-		if err := s.replaceEffects(ch, res.NewEffects); err != nil {
+	if atZero && res.HPDamage > 0 && ch.DeathFail < 3 {
+		ch.DeathFail++
+		if ch.DeathFail > 3 {
+			ch.DeathFail = 3
+		}
+	}
+	if res.AbsorbedTemp > 0 || len(res.NewEffects) != len(visible) {
+		next := append(append([]rules.Effect{}, res.NewEffects...), hidden...)
+		if err := s.replaceEffects(ch, next); err != nil {
 			return res, err
 		}
 		return res, nil
@@ -1227,11 +1276,38 @@ func (s *Service) ApplyHPHeal(ch *Character, userID int64, amount int) error {
 	if err := s.RequireCombatEdit(ch, userID); err != nil {
 		return err
 	}
+	if ch.DeathFail >= 3 {
+		return nil
+	}
 	if amount < 1 {
 		return rules.ErrAmount
 	}
 	ch.HPCurrent = rules.ClampHP(ch.HPCurrent+amount, ch.HPMax)
 	return s.saveVitals(ch)
+}
+
+func (s *Service) RecordDeathSave(ch *Character, userID int64, roll int) error {
+	if err := s.RequireCombatEdit(ch, userID); err != nil {
+		return err
+	}
+	if ch.DeathFail >= 3 {
+		return nil
+	}
+	if ch.HPCurrent > 0 {
+		return rules.ErrAmount
+	}
+	if roll >= 10 {
+		ch.DeathSuccess++
+		if ch.DeathSuccess > 3 {
+			ch.DeathSuccess = 3
+		}
+	} else {
+		ch.DeathFail++
+		if ch.DeathFail > 3 {
+			ch.DeathFail = 3
+		}
+	}
+	return s.persistVitals(ch)
 }
 
 func (s *Service) AdjustHP(ch *Character, ownerID int64, delta int) error {
@@ -1281,6 +1357,19 @@ func (s *Service) ToggleDeath(ch *Character, ownerID int64, fail bool, pip int) 
 func (s *Service) DismissEffect(ch *Character, ownerID, effectID int64) error {
 	if err := s.RequireCombatEdit(ch, ownerID); err != nil {
 		return err
+	}
+	var target *rules.Effect
+	for i := range ch.Effects {
+		if ch.Effects[i].ID == effectID {
+			target = &ch.Effects[i]
+			break
+		}
+	}
+	if target == nil {
+		return ErrNotFound
+	}
+	if target.Hidden && !s.Campaigns.IsDM(ch.CampaignID, ownerID) {
+		return ErrForbidden
 	}
 	if err := s.Repo.DeleteEffect(ch.ID, effectID); err != nil {
 		return err

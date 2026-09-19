@@ -2,23 +2,29 @@ package rules
 
 // Effect is a dismissible buff, debuff, or condition on a live sheet.
 type Effect struct {
-	ID            int64
-	Slug          string
-	Kind          string
-	NameEN        string
-	NameRU        string
-	SourceSpellID int64
-	Source        string
-	DurationKey   string
-	FormulaEN     string
-	FormulaRU     string
-	ACBonus       int
-	ACBase        int
-	ACFloor       int
-	SpeedBonus    int
-	SpeedMult     int
-	TempHP        int
-	Tags          string
+	ID                int64
+	Slug              string
+	Kind              string
+	NameEN            string
+	NameRU            string
+	SourceSpellID     int64
+	Source            string
+	DurationKey       string
+	FormulaEN         string
+	FormulaRU         string
+	ACBonus           int
+	ACBase            int
+	ACFloor           int
+	SpeedBonus        int
+	SpeedMult         int
+	TempHP            int
+	Tags              string
+	Hidden            bool
+	RemoveOnBattleEnd bool
+	DurationTurns     int
+	DamageFormula     string
+	DamageType        string
+	SourceURL         string
 }
 
 func (e Effect) Name(lang string) string {
@@ -147,6 +153,9 @@ func DeriveCombat(in CombatInput) CombatStats {
 		}
 	}
 	for _, e := range in.Effects {
+		if e.Hidden {
+			continue
+		}
 		if e.ACBase > 0 && !armored {
 			mage := e.ACBase + dex
 			if mage > ac {
@@ -180,6 +189,9 @@ func DeriveCombat(in CombatInput) CombatStats {
 	}
 	mult := 1
 	for _, e := range in.Effects {
+		if e.Hidden {
+			continue
+		}
 		speed += e.SpeedBonus
 		if e.SpeedMult > mult {
 			mult = e.SpeedMult
@@ -274,6 +286,9 @@ func ClampTempHP(n int) int {
 func SumTempHP(effects []Effect) int {
 	n := 0
 	for _, e := range effects {
+		if e.Hidden {
+			continue
+		}
 		if e.TempHP > 0 {
 			n += e.TempHP
 		}

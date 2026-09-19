@@ -659,6 +659,77 @@ func (r *Repository) ListMonsterCRs() ([]string, error) {
 	return out, rows.Err()
 }
 
+const conditionSelect = `
+		SELECT id, slug, name_en, name_ru, source_url, source_url_ru, damage_formula, damage_type, is_phb
+		FROM catalog_conditions`
+
+func (r *Repository) ListConditions() ([]Condition, error) {
+	rows, err := r.DB.Query(conditionSelect + ` ORDER BY is_phb DESC, name_en`)
+	if err != nil {
+		return nil, err
+	}
+	return scanConditions(rows)
+}
+
+func (r *Repository) Condition(id int64) (*Condition, error) {
+	return scanCondition(r.DB.QueryRow(conditionSelect+` WHERE id = ?`, id))
+}
+
+func (r *Repository) ConditionBySlug(slug string) (*Condition, error) {
+	return scanCondition(r.DB.QueryRow(conditionSelect+` WHERE slug = ?`, slug))
+}
+
+func (r *Repository) SearchConditions(q string, limit int) ([]Condition, error) {
+	if limit <= 0 || limit > 40 {
+		limit = 20
+	}
+	all, err := r.ListConditions()
+	if err != nil {
+		return nil, err
+	}
+	needle := strings.ToLower(strings.TrimSpace(q))
+	if needle == "" {
+		if len(all) > limit {
+			return all[:limit], nil
+		}
+		return all, nil
+	}
+	var out []Condition
+	for _, c := range all {
+		if matchesFold(needle, c.NameEN, c.NameRU, c.Slug) {
+			out = append(out, c)
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func scanConditions(rows *sql.Rows) ([]Condition, error) {
+	defer rows.Close()
+	var out []Condition
+	for rows.Next() {
+		c, err := scanCondition(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *c)
+	}
+	return out, rows.Err()
+}
+
+func scanCondition(row scanner) (*Condition, error) {
+	c := &Condition{}
+	var phb int
+	if err := row.Scan(&c.ID, &c.Slug, &c.NameEN, &c.NameRU, &c.SourceURL, &c.SourceURLRU,
+		&c.DamageFormula, &c.DamageType, &phb); err != nil {
+		return nil, err
+	}
+	c.IsPHB = phb != 0
+	return c, nil
+}
+
 func fmtCR(v float64) string {
 	return strconv.FormatFloat(v, 'g', -1, 64)
 }

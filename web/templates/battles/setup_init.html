@@ -1,0 +1,47 @@
+<section class="card">
+  <h2 class="font-display text-xl text-gold">{{ t "battle.setup.init" }}</h2>
+  {{if .IsDM}}
+    <p class="mt-1 text-xs text-parchment/50">{{ t "battle.setup.init.note" }}</p>
+  {{end}}
+  <ul class="mt-4 space-y-2">
+    {{range .Battle.Units}}
+      <li class="flex flex-wrap items-center justify-between gap-3 rounded border border-gold/15 px-3 py-2 text-sm">
+        <div>
+          <strong>{{.Name}}</strong>
+          {{if $.IsDM}}
+            <span class="ml-1 text-xs text-parchment/50">DEX {{.DEX}} · AC {{.AC}}</span>
+          {{else if .IsPC}}
+            <span class="ml-1 text-xs text-parchment/50">HP {{.HPCurrent}}/{{.HPMax}}</span>
+          {{end}}
+        </div>
+        {{if $.IsDM}}
+          <div class="flex flex-wrap items-center gap-2">
+            <form class="flex items-center gap-2"
+                  hx-post="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/initiative"
+                  hx-target="#battle-board" hx-swap="outerHTML">
+              <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+              <label class="flex items-center gap-1 text-xs">
+                <span>{{ t "battle.initiative" }}</span>
+                <input class="input" style="width:4.5rem;margin-top:0;padding:.25rem .4rem" type="number" name="initiative" value="{{.Initiative}}">
+              </label>
+              <button class="btn-ghost" type="submit">{{ t "common.apply" }}</button>
+            </form>
+            <form hx-post="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/roll"
+                  hx-target="#battle-board" hx-swap="outerHTML">
+              <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+              <button class="btn-ghost" type="submit">{{ t "battle.roll" }}</button>
+            </form>
+          </div>
+        {{else}}
+          <span class="font-mono text-gold">{{.Initiative}}</span>
+        {{end}}
+      </li>
+    {{end}}
+  </ul>
+  {{if .IsDM}}
+    <form class="mt-4" hx-post="/campaigns/{{.Campaign.ID}}/battle/confirm" hx-target="#battle-board" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <button class="btn-gold" type="submit">{{ t "battle.confirm" }}</button>
+    </form>
+  {{end}}
+</section>

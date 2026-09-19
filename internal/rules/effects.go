@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -82,6 +83,14 @@ func EffectFormula(e Effect) (en, ru string) {
 	if e.HasTag("sanctuary") && len(enP) == 0 {
 		enP = append(enP, "attackers must Wis save")
 		ruP = append(ruP, "атакующие — спас. Мудрости")
+	}
+	if strings.TrimSpace(e.DamageFormula) != "" {
+		line := strings.TrimSpace(e.DamageFormula)
+		if e.DamageType != "" {
+			line += " " + e.DamageType
+		}
+		enP = append(enP, line)
+		ruP = append(ruP, line)
 	}
 	return joinFormula(enP), joinFormula(ruP)
 }

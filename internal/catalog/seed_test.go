@@ -405,6 +405,52 @@ func TestMonsterCatalogGoblinAndSearch(t *testing.T) {
 	}
 }
 
+func TestPHBConditionsSeed(t *testing.T) {
+	dir := t.TempDir()
+	db, err := platform.OpenDB(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{Repo: &Repository{DB: db}}
+	rows, err := svc.ListConditions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := PHBConditions()
+	if len(rows) != len(want) {
+		t.Fatalf("conditions %d want %d", len(rows), len(want))
+	}
+	bySlug := map[string]Condition{}
+	for _, c := range rows {
+		bySlug[c.Slug] = c
+	}
+	poison, ok := bySlug["poisoned"]
+	if !ok || poison.SourceURLRU != ConditionsTableURL {
+		t.Fatalf("poisoned 5e14 %+v", poison)
+	}
+	if poison.SourceURL != conditionAPIURL("poisoned") {
+		t.Fatalf("poisoned 5eapi %s", poison.SourceURL)
+	}
+	if strings.Contains(poison.SourceURLRU, "/condition/poisoned") {
+		t.Fatal("invented condition path")
+	}
+	burn, ok := bySlug["burning"]
+	if !ok || burn.IsPHB || burn.DamageFormula != "1d6" || burn.DamageType != "fire" {
+		t.Fatalf("burning %+v", burn)
+	}
+	if burn.SourceURLRU != "" {
+		t.Fatalf("burning must not invent a 5e14 path %s", burn.SourceURLRU)
+	}
+	ru, err := svc.SearchConditions("ОТРАВ", 10)
+	if err != nil || len(ru) == 0 || ru[0].Slug != "poisoned" {
+		t.Fatalf("unicode search %+v %v", ru, err)
+	}
+}
+
 func slugs(items []Item) []string {
 	out := make([]string, len(items))
 	for i, it := range items {

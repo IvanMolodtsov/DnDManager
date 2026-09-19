@@ -1,0 +1,23 @@
+<div id="battle-board"{{if .OOBBattle}} hx-swap-oob="true"{{end}}>
+  {{template "error" .}}
+  {{if not .Battle}}
+    <section class="card">
+      <p class="text-sm text-parchment/70">{{ t "battle.none" }}</p>
+      {{if .IsDM}}
+        <p class="mt-2 text-xs text-parchment/50">{{ t "battle.none.dm" }}</p>
+        <form class="mt-4" method="post" action="/campaigns/{{.Campaign.ID}}/battle">
+          <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+          <button class="btn-gold" type="submit">{{ t "campaign.battle.start" }}</button>
+        </form>
+      {{end}}
+    </section>
+  {{else if eq .Battle.Status "setup_monsters"}}
+    {{template "battles/setup_monsters.html" .}}
+  {{else if eq .Battle.Status "setup_init"}}
+    {{template "battles/setup_init.html" .}}
+  {{else if eq .Battle.Status "fighting"}}
+    {{template "battles/fight.html" .}}
+  {{else}}
+    {{template "battles/stats.html" .}}
+  {{end}}
+</div>

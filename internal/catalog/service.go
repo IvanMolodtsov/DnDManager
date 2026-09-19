@@ -105,6 +105,17 @@ func (s *Service) MonsterBySlug(slug string) (*Monster, error) {
 	return wrapNotFound(s.Repo.MonsterBySlug(slug))
 }
 
+func (s *Service) ListConditions() ([]Condition, error) { return s.Repo.ListConditions() }
+func (s *Service) SearchConditions(q string, limit int) ([]Condition, error) {
+	return s.Repo.SearchConditions(q, limit)
+}
+func (s *Service) Condition(id int64) (*Condition, error) {
+	return wrapNotFound(s.Repo.Condition(id))
+}
+func (s *Service) ConditionBySlug(slug string) (*Condition, error) {
+	return wrapNotFound(s.Repo.ConditionBySlug(slug))
+}
+
 func wrapNotFound[T any](v *T, err error) (*T, error) {
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
