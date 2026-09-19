@@ -1,0 +1,18 @@
+{{if .CompanionHits}}
+  <ul class="space-y-2">
+    {{range .CompanionHits}}
+      <li class="flex flex-wrap items-center justify-between gap-2 rounded border border-gold/15 px-3 py-2 text-sm">
+        <div>
+          <strong class="text-parchment">{{.Name $.Lang}}</strong>
+          <span class="ml-1 text-xs text-parchment/50">{{.StatsLine}}</span>
+        </div>
+        <form hx-post="/characters/{{$.Character.ID}}/companions" hx-target="#sheet-companions" hx-swap="outerHTML">
+          <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+          <input type="hidden" name="kind" value="{{$.CompanionKind}}">
+          <input type="hidden" name="monster_id" value="{{.ID}}">
+          <button class="btn-gold" type="submit">{{ t "battle.add" }}</button>
+        </form>
+      </li>
+    {{end}}
+  </ul>
+{{end}}

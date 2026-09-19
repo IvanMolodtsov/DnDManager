@@ -6,6 +6,8 @@ import "time"
 const (
 	MemberPlayer = "Player"
 	MemberDM     = "DungeonMaster"
+
+	DefaultSoulsCap = 5000
 )
 
 // Campaign is a table. InviteCode is the join token shown to players.
@@ -15,6 +17,8 @@ type Campaign struct {
 	InviteCode string
 	CreatedBy  int64
 	CreatedAt  time.Time
+	Souls      int
+	SoulsCap   int
 }
 
 // Membership is a user's role in a campaign.

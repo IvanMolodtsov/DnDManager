@@ -3,6 +3,9 @@
     <h2 class="font-display text-xl text-gold">{{ t "battle.round" }} {{.Battle.Round}}</h2>
     {{if .IsDM}}
       <div class="flex flex-wrap gap-2">
+        <button type="button" class="btn-ghost"
+                hx-get="/campaigns/{{.Campaign.ID}}/battle/monsters/add"
+                hx-target="#add-monsters-body" hx-swap="innerHTML">{{ t "battle.add.monsters" }}</button>
         <form hx-post="/campaigns/{{.Campaign.ID}}/battle/next" hx-target="#battle-board" hx-swap="outerHTML">
           <input type="hidden" name="csrf_token" value="{{.CSRF}}">
           <button class="btn-gold" type="submit">{{ t "battle.next" }}</button>
@@ -30,8 +33,15 @@
             {{if .Stable}}<span class="inv-tag">{{ t "battle.stable" }}</span>{{end}}
           </div>
           <p class="mt-1 text-xs text-parchment/60">
-            {{if .IsPC}}
+            {{if .ShowPlayerHP}}
               HP {{.HPCurrent}}/{{.HPMax}}{{if .TempHP}} · temp {{.TempHP}}{{end}}
+              {{if and $.IsDM (not .IsPC)}}
+                · AC {{.DisplayAC}}
+                {{if .ResistLine}} · {{.ResistLine}}{{end}}
+                {{if .ArticleURL}}
+                  · <a class="text-gold hover:underline" href="{{.ArticleURL}}" target="_blank" rel="noopener">{{ t "battle.edit.article" }}</a>
+                {{end}}
+              {{end}}
             {{else if $.IsDM}}
               HP {{.HPCurrent}}/{{.HPMax}}{{if .TempHP}} · temp {{.TempHP}}{{end}} · AC {{.DisplayAC}}
               {{if .IsMonster}} · {{.ScoreLine}}{{end}}
@@ -86,9 +96,9 @@
             </div>
           {{end}}
         </div>
-        {{if and $.IsDM (not .Escaped)}}
+        {{if and (not .Escaped) (or $.IsDM (.CanCombatHP $.IsDM $.ViewerID))}}
           <div class="flex flex-wrap items-center gap-1">
-            {{if not .Dead}}
+            {{if and (not .Dead) (.CanCombatHP $.IsDM $.ViewerID)}}
               <button type="button" class="ability-save-btn"
                       hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/adjust?pool=hp&amp;sign=-"
                       hx-target="#hp-adjust-body" hx-swap="innerHTML">−</button>
@@ -96,20 +106,27 @@
                       hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/adjust?pool=hp&amp;sign=%2B"
                       hx-target="#hp-adjust-body" hx-swap="innerHTML">+</button>
             {{end}}
-            {{if and .IsPC .Knocked (not .Dead) $active (not .Stable)}}
+            {{if and $.IsDM .IsPC .Knocked (not .Dead) $active (not .Stable)}}
               <button type="button" class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem"
                       hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/death-save"
                       hx-target="#death-save-body" hx-swap="innerHTML">{{ t "battle.death_save" }}</button>
             {{end}}
-            <button type="button" class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem"
-                    hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/effects/new"
-                    hx-target="#status-add-body" hx-swap="innerHTML">{{ t "character.status.add" }}</button>
-            {{if not .Dead}}
-              <form hx-post="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/escape"
-                    hx-target="#battle-board" hx-swap="outerHTML">
-                <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
-                <button class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem" type="submit">{{ t "battle.escape" }}</button>
-              </form>
+            {{if and .IsPC (index $.ConjureIDs .CharacterID)}}
+              <button type="button" class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem"
+                      hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/summon"
+                      hx-target="#summon-body" hx-swap="innerHTML">{{ t "battle.summon" }}</button>
+            {{end}}
+            {{if $.IsDM}}
+              <button type="button" class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem"
+                      hx-get="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/effects/new"
+                      hx-target="#status-add-body" hx-swap="innerHTML">{{ t "character.status.add" }}</button>
+              {{if not .Dead}}
+                <form hx-post="/campaigns/{{$.Campaign.ID}}/battle/units/{{.ID}}/escape"
+                      hx-target="#battle-board" hx-swap="outerHTML">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                  <button class="btn-ghost" style="padding:.2rem .5rem;font-size:.7rem" type="submit">{{ t "battle.escape" }}</button>
+                </form>
+              {{end}}
             {{end}}
           </div>
         {{end}}

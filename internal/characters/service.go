@@ -22,12 +22,13 @@ var (
 
 // Service hydrates sheets, persists drafts, and applies confirmed progression.
 type Service struct {
-	Repo       *Repository
-	Campaigns  *campaigns.Service
-	Catalog    *catalog.Service
-	Rules      *rules.Engine
-	Events     *VitalsHub
-	OnCampaign func(campaignID int64)
+	Repo              *Repository
+	Campaigns         *campaigns.Service
+	Catalog           *catalog.Service
+	Rules             *rules.Engine
+	Events            *VitalsHub
+	OnCampaign        func(campaignID int64)
+	OnCompanionChange func(campaignID, characterID int64)
 }
 
 func (s *Service) Get(id int64) (*Character, error) {
@@ -69,6 +70,8 @@ func (s *Service) ListByCampaign(campaignID int64) ([]campaigns.CharacterSummary
 			Level:   ch.Level,
 			Owner:   ch.OwnerName,
 			OwnerID: ch.OwnerID,
+			Gold:    ch.Gold,
+			Dead:    ch.HasDeadStatus(),
 		})
 	}
 	return out, nil
@@ -365,6 +368,7 @@ func (s *Service) hydrate(ch *Character) error {
 		}
 		feats = append(feats, rules.FeatureGrant{
 			ID:        f.ID,
+			Slug:      f.Slug,
 			Name:      f.Name(lang),
 			SourceURL: f.Source(lang),
 			Kind:      f.SourceKind,
@@ -382,6 +386,10 @@ func (s *Service) hydrate(ch *Character) error {
 	if err := s.loadInventory(ch); err != nil {
 		return err
 	}
+	if err := s.loadMutations(ch); err != nil {
+		return err
+	}
+	s.loadGrantedSpells(ch)
 	if err := s.ensureSkills(ch); err != nil {
 		return err
 	}
@@ -391,6 +399,9 @@ func (s *Service) hydrate(ch *Character) error {
 	}
 	ch.Effects = effects
 	ch.HPTemp = rules.SumTempHP(effects)
+	if err := s.loadCompanions(ch); err != nil {
+		return err
+	}
 	return s.syncResources(ch)
 }
 
@@ -559,6 +570,32 @@ func ErrorKey(err error) string {
 		return "error.hp.damage_type"
 	case errors.Is(err, ErrStatusName):
 		return "error.status.name"
+	case errors.Is(err, ErrCompanionGate):
+		return "error.companion.gate"
+	case errors.Is(err, ErrCompanionLimit):
+		return "error.companion.limit"
+	case errors.Is(err, ErrCompanionKind), errors.Is(err, ErrCompanionType):
+		return "error.companion.kind"
+	case errors.Is(err, ErrCompanionCR):
+		return "error.companion.cr"
+	case errors.Is(err, ErrCompanionMissing):
+		return "error.companion.missing"
+	case errors.Is(err, ErrSoulsCap):
+		return "error.souls.cap"
+	case errors.Is(err, ErrDeadLocked):
+		return "error.character.dead.locked"
+	case errors.Is(err, ErrNotDead):
+		return "error.character.not_dead"
+	case errors.Is(err, ErrReviveSouls):
+		return "error.character.revive.souls"
+	case errors.Is(err, ErrNoMonster):
+		return "error.mutation.none"
+	case errors.Is(err, ErrBodyPart):
+		return "error.mutation.part"
+	case errors.Is(err, ErrMutationType):
+		return "error.mutation.type"
+	case errors.Is(err, ErrMutationCR):
+		return "error.mutation.cr"
 	default:
 		return "error.generic"
 	}
@@ -604,6 +641,23 @@ func (s *Service) loadGrantedSpells(ch *Character) {
 			out = append(out, GrantedSpell{
 				Spell: *sp, ItemID: it.ID,
 				ItemNameEN: it.DisplayName("en"), ItemNameRU: it.DisplayName("ru"),
+			})
+		}
+	}
+	for _, mut := range ch.Mutations {
+		g := rules.GrantsFromFeatures(mut.Features)
+		for _, id := range g.SpellIDs {
+			if seen[id] {
+				continue
+			}
+			sp, err := s.Catalog.Spell(id)
+			if err != nil {
+				continue
+			}
+			seen[id] = true
+			out = append(out, GrantedSpell{
+				Spell: *sp, ItemID: 0,
+				ItemNameEN: mut.NameEN, ItemNameRU: mut.NameRU,
 			})
 		}
 	}
@@ -886,7 +940,9 @@ func (s *Service) EquipItem(ch *Character, ownerID, invID int64, slot string) er
 		piece.Attuned = true
 		piece.RequiresAttune = true
 	}
-	if err := rules.CheckEquip(ch.EquippedGear(), piece); err != nil {
+	if err := rules.CheckEquipOpts(ch.EquippedGear(), piece, rules.EquipRules{
+		Hands: ch.AllGrants().Hands, Blocked: ch.AllGrants().BlockedSlots,
+	}); err != nil {
 		return err
 	}
 	it.EquippedSlot = norm
@@ -1188,7 +1244,7 @@ func (s *Service) replaceEffects(ch *Character, next []rules.Effect) error {
 		}
 	}
 	for _, e := range cur {
-		if keep[e.Slug] {
+		if keep[e.Slug] || e.Slug == rules.DeadSlug {
 			continue
 		}
 		if err := s.Repo.DeleteEffect(ch.ID, e.ID); err != nil {
@@ -1226,6 +1282,11 @@ func (s *Service) persistVitals(ch *Character) error {
 	if err := s.Repo.UpdateVitals(ch.ID, ch.HPCurrent, ch.HPTemp, ch.DeathSuccess, ch.DeathFail); err != nil {
 		return err
 	}
+	if ch.DeathFail >= 3 {
+		if err := s.ensureDeadStatus(ch); err != nil {
+			return err
+		}
+	}
 	s.broadcastVitals(ch.ID)
 	s.notifyCampaign(ch)
 	return nil
@@ -1251,7 +1312,7 @@ func (s *Service) ApplyHPDamage(ch *Character, userID int64, amount int, dmgType
 	atZero := ch.HPCurrent == 0
 	visible := rules.DeriveEffects(ch.Effects)
 	hidden := rules.HiddenEffects(ch.Effects)
-	res := rules.ApplyDamage(ch.HPCurrent, ch.HPMax, visible, ch.EquippedGrants(), amount, dmgType)
+	res := rules.ApplyDamage(ch.HPCurrent, ch.HPMax, visible, ch.AllGrants(), amount, dmgType)
 	ch.HPCurrent = res.NewHP
 	if atZero && res.HPDamage > 0 && ch.DeathFail < 3 {
 		ch.DeathFail++
@@ -1367,6 +1428,9 @@ func (s *Service) DismissEffect(ch *Character, ownerID, effectID int64) error {
 	}
 	if target == nil {
 		return ErrNotFound
+	}
+	if target.Slug == rules.DeadSlug {
+		return ErrDeadLocked
 	}
 	if target.Hidden && !s.Campaigns.IsDM(ch.CampaignID, ownerID) {
 		return ErrForbidden

@@ -142,27 +142,7 @@ func (e *SlotOccupiedError) Error() string {
 func (e *SlotOccupiedError) Unwrap() error { return ErrSlotOccupied }
 
 func CheckEquip(current []GearPiece, adding GearPiece) error {
-	occ := OccupiedMap(current)
-	slot, ok := NormalizeEquipSlot(adding.Slot, adding.Slot, occ)
-	if !ok {
-		return ErrSlotRequired
-	}
-	adding.Slot = slot
-	if adding.RequiresAttune && !adding.Attuned {
-		if AttunementCount(current) >= MaxAttunement {
-			return ErrAttunementFull
-		}
-	}
-	if adding.Attuned && AttunementCount(current) >= MaxAttunement {
-		return ErrAttunementFull
-	}
-	taken := SlotsTaken(adding)
-	for _, s := range taken {
-		if other, busy := occ[s]; busy {
-			return &SlotOccupiedError{Slot: s, OtherName: other.Name}
-		}
-	}
-	return nil
+	return CheckEquipOpts(current, adding, EquipRules{})
 }
 
 func WearingArmor(gear []GearPiece) bool {

@@ -88,6 +88,7 @@ type Intent struct {
 // FeatureGrant is a newly acquired catalog feature for display and persistence.
 type FeatureGrant struct {
 	ID        int64
+	Slug      string
 	Name      string
 	NameEN    string
 	NameRU    string

@@ -255,6 +255,7 @@ func (e *Engine) gatherLevelFeatures(classID, subclassID int64, newClassLevel in
 func grant(f catalog.Feature, lang string) FeatureGrant {
 	return FeatureGrant{
 		ID:        f.ID,
+		Slug:      f.Slug,
 		Name:      f.Name(lang),
 		NameEN:    f.NameEN,
 		NameRU:    f.NameRU,

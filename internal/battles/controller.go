@@ -31,11 +31,13 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("GET /campaigns/{id}/battle/events", auth(http.HandlerFunc(c.events)))
 	mux.Handle("GET /campaigns/{id}/battle/monsters/search", auth(http.HandlerFunc(c.searchMonsters)))
 	mux.Handle("GET /campaigns/{id}/battle/monsters/{mid}/preview", auth(http.HandlerFunc(c.previewMonster)))
+	mux.Handle("GET /campaigns/{id}/battle/monsters/add", auth(http.HandlerFunc(c.addMonstersModal)))
 	mux.Handle("POST /campaigns/{id}/battle/monsters", auth(http.HandlerFunc(c.addMonsters)))
 	mux.Handle("GET /campaigns/{id}/battle/monsters/{mid}/edit", auth(http.HandlerFunc(c.editMonsterStats)))
 	mux.Handle("POST /campaigns/{id}/battle/monsters/{mid}/edit", auth(http.HandlerFunc(c.saveMonsterStats)))
 	mux.Handle("POST /campaigns/{id}/battle/monsters/{mid}/remove", auth(http.HandlerFunc(c.removeMonsters)))
 	mux.Handle("POST /campaigns/{id}/battle/initiative", auth(http.HandlerFunc(c.beginInitiative)))
+	mux.Handle("POST /campaigns/{id}/battle/initiative/monsters", auth(http.HandlerFunc(c.rollMonsterInitiatives)))
 	mux.Handle("POST /campaigns/{id}/battle/units/{uid}/initiative", auth(http.HandlerFunc(c.setInitiative)))
 	mux.Handle("POST /campaigns/{id}/battle/units/{uid}/roll", auth(http.HandlerFunc(c.rollInitiative)))
 	mux.Handle("POST /campaigns/{id}/battle/confirm", auth(http.HandlerFunc(c.confirm)))
@@ -52,6 +54,17 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("GET /campaigns/{id}/battle/units/{uid}/effects/search", auth(http.HandlerFunc(c.searchConditions)))
 	mux.Handle("POST /campaigns/{id}/battle/units/{uid}/effects", auth(http.HandlerFunc(c.addUnitStatus)))
 	mux.Handle("POST /campaigns/{id}/battle/units/{uid}/effects/{eid}/remove", auth(http.HandlerFunc(c.removeUnitStatus)))
+	mux.Handle("GET /campaigns/{id}/battle/units/{uid}/summon", auth(http.HandlerFunc(c.summonModal)))
+	mux.Handle("GET /campaigns/{id}/battle/units/{uid}/summon/search", auth(http.HandlerFunc(c.searchSummon)))
+	mux.Handle("POST /campaigns/{id}/battle/units/{uid}/summon", auth(http.HandlerFunc(c.addSummon)))
+	mux.Handle("POST /campaigns/{id}/battle/loot/generate", auth(http.HandlerFunc(c.generateLoot)))
+	mux.Handle("GET /campaigns/{id}/battle/loot/items/new", auth(http.HandlerFunc(c.lootAddModal)))
+	mux.Handle("GET /campaigns/{id}/battle/loot/items/search", auth(http.HandlerFunc(c.lootSearch)))
+	mux.Handle("GET /campaigns/{id}/battle/loot/items/{iid}/preview", auth(http.HandlerFunc(c.lootPreview)))
+	mux.Handle("POST /campaigns/{id}/battle/loot/items", auth(http.HandlerFunc(c.addLootItem)))
+	mux.Handle("GET /campaigns/{id}/battle/loot/quest", auth(http.HandlerFunc(c.lootQuestModal)))
+	mux.Handle("POST /campaigns/{id}/battle/loot/quest", auth(http.HandlerFunc(c.addQuestItem)))
+	mux.Handle("POST /campaigns/{id}/battle/loot/{lid}/remove", auth(http.HandlerFunc(c.removeLoot)))
 }
 
 func (c *Controller) base(r *http.Request, title string) platform.BaseView {
@@ -66,8 +79,10 @@ type boardView struct {
 	Groups           []MonsterGroup
 	Query            string
 	CR               string
+	Type             string
 	Results          []catalog.Monster
 	CRs              []string
+	Types            []catalog.MonsterTypeOption
 	Preview          *catalog.Monster
 	Stats            Stats
 	HPResult         *characters.HPResult
@@ -91,6 +106,15 @@ type boardView struct {
 	StatusNewURL     string
 	StatusSearchURL  string
 	StatusPostURL    string
+	ViewerID         int64
+	SummonUnit       *Unit
+	SummonSpell      string
+	SummonType       string
+	ConjureIDs       map[int64]bool
+	ConjureSpells    []string
+	LootQuery        string
+	LootResults      []catalog.Item
+	LootItem         *catalog.Item
 }
 
 func (c *Controller) loadView(w http.ResponseWriter, r *http.Request) (*boardView, bool) {
@@ -122,13 +146,32 @@ func (c *Controller) loadView(w http.ResponseWriter, r *http.Request) (*boardVie
 		IsDM:        c.Campaigns.IsDM(id, u.ID),
 		DamageTypes: rules.DamageTypes(),
 		AbilityKeys: rules.AbilityKeys,
+		ViewerID:    u.ID,
+		ConjureIDs:  map[int64]bool{},
 	}
 	if b != nil {
 		v.Groups = c.Svc.Groups(b, lang)
 		v.Stats = b.ComputeStats()
+		if b.Fighting() {
+			v.ConjureIDs = map[int64]bool{}
+			for _, unit := range b.Units {
+				if !unit.IsPC() {
+					continue
+				}
+				ch, err := c.Characters.Get(unit.CharacterID)
+				if err != nil {
+					continue
+				}
+				if len(characters.GateCompanions(ch).Conjure) > 0 && (v.IsDM || ch.OwnerID == u.ID) {
+					v.ConjureIDs[unit.CharacterID] = true
+				}
+			}
+		}
 	}
 	crs, _ := c.Catalog.ListMonsterCRs()
 	v.CRs = crs
+	types, _ := c.Catalog.ListMonsterTypes()
+	v.Types = types
 	return v, true
 }
 
@@ -209,6 +252,22 @@ func (c *Controller) beginInitiative(w http.ResponseWriter, r *http.Request) {
 
 func (c *Controller) confirm(w http.ResponseWriter, r *http.Request) {
 	c.mutateBoard(w, r, c.Svc.ConfirmInitiative)
+}
+
+func (c *Controller) rollMonsterInitiatives(w http.ResponseWriter, r *http.Request) {
+	c.mutateBoard(w, r, c.Svc.RollMonsterInitiatives)
+}
+
+func (c *Controller) addMonstersModal(w http.ResponseWriter, r *http.Request) {
+	v, ok := c.loadView(w, r)
+	if !ok {
+		return
+	}
+	if !v.IsDM {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	c.Render.Render(w, "battles/add_monsters.html", v.Lang, http.StatusOK, v)
 }
 
 func (c *Controller) dismiss(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +407,7 @@ func (c *Controller) saveMonsterStats(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Battle = b
 	v.Groups = c.Svc.Groups(b, v.Lang)
-	c.Render.Render(w, "battles/monster_roster.html", v.Lang, http.StatusOK, v)
+	c.renderRoster(w, r, v, b, http.StatusOK)
 }
 
 func groupStatsFromForm(r *http.Request) GroupStats {
@@ -390,7 +449,17 @@ func (c *Controller) renderRosterAfter(w http.ResponseWriter, r *http.Request, f
 	}
 	v.Battle = b
 	v.Groups = c.Svc.Groups(b, v.Lang)
-	c.Render.Render(w, "battles/monster_roster.html", v.Lang, http.StatusOK, v)
+	c.renderRoster(w, r, v, b, http.StatusOK)
+}
+
+func (c *Controller) renderRoster(w http.ResponseWriter, r *http.Request, v *boardView, b *Battle, status int) {
+	if b != nil && b.Fighting() {
+		v.OOBBattle = true
+		v.Stats = b.ComputeStats()
+		c.Render.Render(w, "battles/monster_roster_after.html", v.Lang, status, v)
+		return
+	}
+	c.Render.Render(w, "battles/monster_roster.html", v.Lang, status, v)
 }
 
 func (c *Controller) searchMonsters(w http.ResponseWriter, r *http.Request) {
@@ -404,7 +473,8 @@ func (c *Controller) searchMonsters(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Query = r.URL.Query().Get("q")
 	v.CR = r.URL.Query().Get("cr")
-	res, err := c.Catalog.SearchMonsters(v.Query, v.CR, 20)
+	v.Type = r.URL.Query().Get("type")
+	res, err := c.Catalog.SearchMonsters(v.Query, v.CR, v.Type, 20)
 	if err != nil {
 		http.Error(w, "error", http.StatusInternalServerError)
 		return
@@ -461,13 +531,13 @@ func (c *Controller) hpAdjustModal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !v.IsDM {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
 	u := c.unitFrom(r, v)
 	if u == nil {
 		http.NotFound(w, r)
+		return
+	}
+	if !u.CanCombatHP(v.IsDM, v.ViewerID) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	pool := r.URL.Query().Get("pool")
@@ -489,12 +559,12 @@ func (c *Controller) applyHPAdjust(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !v.IsDM {
+	u := platform.UserFrom(r.Context())
+	unit := c.unitFrom(r, v)
+	if unit != nil && !unit.CanCombatHP(v.IsDM, u.ID) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	u := platform.UserFrom(r.Context())
-	unit := c.unitFrom(r, v)
 	if unit == nil {
 		http.NotFound(w, r)
 		return
@@ -674,6 +744,100 @@ func (c *Controller) events(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 	}
+}
+
+func (c *Controller) summonModal(w http.ResponseWriter, r *http.Request) {
+	v, ok := c.loadView(w, r)
+	if !ok {
+		return
+	}
+	u := c.unitFrom(r, v)
+	if u == nil || !u.IsPC() {
+		http.NotFound(w, r)
+		return
+	}
+	if !c.canSummon(v, u) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	v.SummonUnit = u
+	v.SummonSpell = r.URL.Query().Get("spell")
+	if ch, err := c.Characters.Get(u.CharacterID); err == nil {
+		v.ConjureSpells = characters.GateCompanions(ch).Conjure
+	}
+	c.Render.Render(w, "battles/summon.html", v.Lang, http.StatusOK, v)
+}
+
+func (c *Controller) searchSummon(w http.ResponseWriter, r *http.Request) {
+	v, ok := c.loadView(w, r)
+	if !ok {
+		return
+	}
+	u := c.unitFrom(r, v)
+	if u == nil || !c.canSummon(v, u) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	v.SummonUnit = u
+	v.SummonSpell = r.URL.Query().Get("spell")
+	v.Query = r.URL.Query().Get("q")
+	v.CR = r.URL.Query().Get("cr")
+	typ := r.URL.Query().Get("type")
+	if want := catalog.ConjureType(v.SummonSpell); want != "" {
+		typ = want
+	}
+	v.Type = typ
+	v.SummonType = typ
+	res, err := c.Catalog.SearchMonsters(v.Query, v.CR, typ, 20)
+	if err != nil {
+		http.Error(w, "error", http.StatusInternalServerError)
+		return
+	}
+	v.Results = res
+	c.Render.Render(w, "battles/summon_results.html", v.Lang, http.StatusOK, v)
+}
+
+func (c *Controller) addSummon(w http.ResponseWriter, r *http.Request) {
+	v, ok := c.loadView(w, r)
+	if !ok {
+		return
+	}
+	u := c.unitFrom(r, v)
+	if u == nil || !u.IsPC() {
+		http.NotFound(w, r)
+		return
+	}
+	user := platform.UserFrom(r.Context())
+	spell := platform.FormTrim(r, "spell")
+	mid := platform.FormInt64(r, "monster_id")
+	qty := platform.FormInt(r, "qty")
+	b, err := c.Svc.AddSummon(v.Campaign.ID, user.ID, u.CharacterID, mid, qty, spell, v.Lang)
+	if err != nil {
+		v.SummonUnit = u
+		v.SummonSpell = spell
+		v.Error = ErrorKey(err)
+		c.Render.Render(w, "battles/summon.html", v.Lang, statusFor(err), v)
+		return
+	}
+	v.Battle = b
+	v.Groups = c.Svc.Groups(b, v.Lang)
+	v.Stats = b.ComputeStats()
+	v.OOBBattle = true
+	c.Render.Render(w, "battles/summon_after.html", v.Lang, http.StatusOK, v)
+}
+
+func (c *Controller) canSummon(v *boardView, u *Unit) bool {
+	if u == nil || !u.IsPC() || v.Battle == nil || !v.Battle.Fighting() {
+		return false
+	}
+	ch, err := c.Characters.Get(u.CharacterID)
+	if err != nil {
+		return false
+	}
+	if !v.IsDM && ch.OwnerID != v.ViewerID {
+		return false
+	}
+	return len(characters.GateCompanions(ch).Conjure) > 0
 }
 
 func statusFor(err error) int {

@@ -1,0 +1,21 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "battle.loot.add_quest" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('loot-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{template "error" .}}
+  <p class="mt-1 text-xs text-parchment/50">{{ t "battle.loot.quest.note" }}</p>
+  <form class="mt-4 space-y-3"
+        hx-post="/campaigns/{{.Campaign.ID}}/battle/loot/quest"
+        hx-target="#battle-board" hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+    <label class="block text-sm">
+      <span>{{ t "battle.loot.quest.name" }}</span>
+      <input class="input" type="text" name="name" maxlength="80" required autofocus>
+    </label>
+    <div class="flex flex-wrap gap-2">
+      <button class="btn-gold" type="submit">{{ t "battle.loot.add_quest" }}</button>
+      <button type="button" class="btn-ghost" onclick="document.getElementById('loot-add-modal').close()">{{ t "common.cancel" }}</button>
+    </div>
+  </form>
+</div>

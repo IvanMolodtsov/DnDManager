@@ -15,11 +15,25 @@ type CharacterSummary struct {
 	Level   int
 	Owner   string
 	OwnerID int64
+	Gold    int
+	Dead    bool
+}
+
+// PartyGold is the derived sum of gold held by campaign PCs.
+func PartyGold(chars []CharacterSummary) int {
+	sum := 0
+	for _, ch := range chars {
+		sum += ch.Gold
+	}
+	return sum
 }
 
 // CharacterLister is implemented by characters.Service.
 type CharacterLister interface {
 	ListByCampaign(campaignID int64) ([]CharacterSummary, error)
+	AdjustCampaignGold(campaignID, characterID, userID int64, delta int) error
+	BroadcastWallet(campaignID int64)
+	Revive(campaignID, characterID, userID int64) error
 }
 
 // BattleFinder is implemented by battles.Service (avoids an import cycle).
@@ -43,6 +57,12 @@ func (c *Controller) Mount(mux *http.ServeMux, auth func(http.Handler) http.Hand
 	mux.Handle("GET /campaigns/join", auth(http.HandlerFunc(c.showJoin)))
 	mux.Handle("POST /campaigns/join", auth(http.HandlerFunc(c.join)))
 	mux.Handle("GET /campaigns/{id}", auth(http.HandlerFunc(c.show)))
+	mux.Handle("GET /campaigns/{id}/souls/adjust", auth(http.HandlerFunc(c.soulsAdjustModal)))
+	mux.Handle("GET /campaigns/{id}/souls/cap", auth(http.HandlerFunc(c.soulsCapModal)))
+	mux.Handle("POST /campaigns/{id}/souls", auth(http.HandlerFunc(c.applySouls)))
+	mux.Handle("GET /campaigns/{id}/characters/{cid}/gold/adjust", auth(http.HandlerFunc(c.goldAdjustModal)))
+	mux.Handle("POST /campaigns/{id}/characters/{cid}/gold", auth(http.HandlerFunc(c.applyGold)))
+	mux.Handle("POST /campaigns/{id}/characters/{cid}/revive", auth(http.HandlerFunc(c.applyRevive)))
 }
 
 func (c *Controller) base(r *http.Request, title string) platform.BaseView {
@@ -115,42 +135,55 @@ func (c *Controller) join(w http.ResponseWriter, r *http.Request) {
 
 type showView struct {
 	platform.BaseView
-	Campaign   *Campaign
-	Members    []Membership
-	Characters []CharacterSummary
-	MemberRole string
-	IsDM       bool
-	HasBattle  bool
+	Campaign      *Campaign
+	Members       []Membership
+	Characters    []CharacterSummary
+	PartyGold     int
+	MemberRole    string
+	IsDM          bool
+	HasBattle     bool
+	AdjustPool    string
+	AdjustSign    string
+	AdjustAmount  int
+	GoldCharacter *CharacterSummary
 }
 
 func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
+	v, ok := c.loadShow(w, r)
+	if !ok {
+		return
+	}
+	c.Render.Render(w, "campaigns/show.html", v.Lang, http.StatusOK, v)
+}
+
+func (c *Controller) loadShow(w http.ResponseWriter, r *http.Request) (showView, bool) {
 	id, err := platform.PathID(r, "id")
 	if err != nil {
 		http.NotFound(w, r)
-		return
+		return showView{}, false
 	}
 	u := platform.UserFrom(r.Context())
 	camp, err := c.Svc.Get(id)
 	if err != nil {
 		http.NotFound(w, r)
-		return
+		return showView{}, false
 	}
 	mem, err := c.Svc.RequireMember(id, u.ID)
 	if err != nil {
 		http.Error(w, "forbidden", http.StatusForbidden)
-		return
+		return showView{}, false
 	}
 	members, err := c.Svc.Members(id)
 	if err != nil {
 		http.Error(w, "error", http.StatusInternalServerError)
-		return
+		return showView{}, false
 	}
 	var chars []CharacterSummary
 	if c.Characters != nil {
 		chars, err = c.Characters.ListByCampaign(id)
 		if err != nil {
 			http.Error(w, "error", http.StatusInternalServerError)
-			return
+			return showView{}, false
 		}
 	}
 	hasBattle := false
@@ -158,17 +191,17 @@ func (c *Controller) show(w http.ResponseWriter, r *http.Request) {
 		hasBattle, err = c.Battles.HasBattle(id)
 		if err != nil {
 			http.Error(w, "error", http.StatusInternalServerError)
-			return
+			return showView{}, false
 		}
 	}
-	v := showView{
+	return showView{
 		BaseView:   c.base(r, camp.Name),
 		Campaign:   camp,
 		Members:    members,
 		Characters: chars,
+		PartyGold:  PartyGold(chars),
 		MemberRole: mem.Role,
 		IsDM:       mem.Role == MemberDM,
 		HasBattle:  hasBattle,
-	}
-	c.Render.Render(w, "campaigns/show.html", v.Lang, http.StatusOK, v)
+	}, true
 }

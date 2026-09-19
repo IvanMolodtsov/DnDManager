@@ -1,0 +1,71 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "character.companion.edit" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('companion-edit-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{if .EditCompanion}}
+    {{$src := .EditCompanion.ArticleURL}}
+    {{if $src}}
+      <p class="mt-1 text-sm"><a class="text-gold hover:underline" href="{{$src}}" target="_blank" rel="noopener">{{ t "battle.edit.article" }}</a></p>
+    {{end}}
+  {{end}}
+  {{template "error" .}}
+  {{if .EditCompanion}}
+    <form class="mt-4 space-y-3"
+          hx-post="/characters/{{.Character.ID}}/companions/{{.EditCompanion.ID}}/edit"
+          hx-target="#sheet-companions" hx-swap="outerHTML"
+          hx-on::after-request="if (event.detail.successful) document.getElementById('companion-edit-modal').close()">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <label class="block text-sm">
+        <span>{{ t "character.companion.name" }}</span>
+        <input class="input" name="name" value="{{.EditCompanion.Name}}">
+      </label>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="block text-sm"><span>{{ t "battle.hp.max" }}</span><input class="input" type="number" name="hp_max" min="1" max="999" value="{{.EditCompanion.HPMax}}" required></label>
+        <label class="block text-sm"><span>{{ t "battle.ac" }}</span><input class="input" type="number" name="ac" min="0" max="40" value="{{.EditCompanion.AC}}" required></label>
+      </div>
+      <div class="grid gap-3 grid-cols-2 sm:grid-cols-3">
+        {{range .AbilityKeys}}
+          <label class="block text-sm">
+            <span>{{ t (printf "ability.%s" .) }}</span>
+            <input class="input" type="number" name="{{.}}" min="1" max="30" value="{{$.EditCompanion.Score .}}" required>
+          </label>
+        {{end}}
+      </div>
+      <fieldset>
+        <legend class="text-sm">{{ t "battle.edit.resist" }}</legend>
+        <div class="monster-trait-grid">
+          {{range .DamageTypes}}
+            <label class="flex items-center gap-1 text-xs">
+              <input type="checkbox" name="resist" value="{{.Slug}}" {{if $.EditCompanion.HasResist .Slug}}checked{{end}}>
+              <span>{{.Name $.Lang}}</span>
+            </label>
+          {{end}}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="text-sm">{{ t "battle.edit.immune" }}</legend>
+        <div class="monster-trait-grid">
+          {{range .DamageTypes}}
+            <label class="flex items-center gap-1 text-xs">
+              <input type="checkbox" name="immune" value="{{.Slug}}" {{if $.EditCompanion.HasImmune .Slug}}checked{{end}}>
+              <span>{{.Name $.Lang}}</span>
+            </label>
+          {{end}}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="text-sm">{{ t "battle.edit.vuln" }}</legend>
+        <div class="monster-trait-grid">
+          {{range .DamageTypes}}
+            <label class="flex items-center gap-1 text-xs">
+              <input type="checkbox" name="vuln" value="{{.Slug}}" {{if $.EditCompanion.HasVuln .Slug}}checked{{end}}>
+              <span>{{.Name $.Lang}}</span>
+            </label>
+          {{end}}
+        </div>
+      </fieldset>
+      <button class="btn-gold" type="submit">{{ t "common.apply" }}</button>
+    </form>
+  {{end}}
+</div>

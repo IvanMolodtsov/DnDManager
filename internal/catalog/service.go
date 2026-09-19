@@ -47,6 +47,12 @@ func (s *Service) ListItems() ([]Item, error) { return s.Repo.ListItems() }
 func (s *Service) SearchItems(q string, limit int) ([]Item, error) {
 	return s.Repo.SearchItems(q, limit)
 }
+func (s *Service) LootMagicByRarity(rarity string) ([]Item, error) {
+	return s.Repo.LootMagicByRarity(rarity)
+}
+func (s *Service) SpellsInLevelRange(min, max int) ([]Spell, error) {
+	return s.Repo.SpellsInLevelRange(min, max)
+}
 func (s *Service) ListBaseWeapons() ([]Item, error) { return s.Repo.ListBaseWeapons() }
 func (s *Service) ListBaseArmor() ([]Item, error)   { return s.Repo.ListBaseArmor() }
 func (s *Service) ListBaseJewelry() ([]Item, error) { return s.Repo.ListBaseJewelry() }
@@ -94,10 +100,26 @@ func (s *Service) SpellBySlug(slug string) (*Spell, error) {
 }
 
 func (s *Service) ListMonsters() ([]Monster, error) { return s.Repo.ListMonsters() }
-func (s *Service) SearchMonsters(q, cr string, limit int) ([]Monster, error) {
-	return s.Repo.SearchMonsters(q, cr, limit)
+func (s *Service) SearchMonsters(q, cr, typ string, limit int) ([]Monster, error) {
+	if limit <= 0 || limit > 40 {
+		limit = 20
+	}
+	return s.Repo.SearchMonstersFilter(q, cr, typ, "", limit)
+}
+func (s *Service) SearchMonstersFilter(q, cr, typ, size string, limit int) ([]Monster, error) {
+	if limit < 1 {
+		limit = 200
+	}
+	return s.Repo.SearchMonstersFilter(q, cr, typ, size, limit)
 }
 func (s *Service) ListMonsterCRs() ([]string, error) { return s.Repo.ListMonsterCRs() }
+func (s *Service) ListMonsterTypes() ([]MonsterTypeOption, error) {
+	slugs, err := s.Repo.ListMonsterTypes()
+	if err != nil {
+		return nil, err
+	}
+	return typeOptions(slugs), nil
+}
 func (s *Service) Monster(id int64) (*Monster, error) {
 	return wrapNotFound(s.Repo.Monster(id))
 }

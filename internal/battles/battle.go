@@ -15,19 +15,24 @@ const (
 	StatusFighting      = "fighting"
 	StatusEnded         = "ended"
 
-	KindPC      = "pc"
-	KindMonster = "monster"
+	KindPC        = "pc"
+	KindMonster   = "monster"
+	KindCompanion = "companion"
+	KindSummon    = "summon"
 )
 
 // Battle is one encounter for a campaign (unique until dismissed).
 type Battle struct {
-	ID          int64
-	CampaignID  int64
-	Status      string
-	Round       int
-	ActiveIndex int
-	CreatedBy   int64
-	Units       []Unit
+	ID            int64
+	CampaignID    int64
+	Status        string
+	Round         int
+	ActiveIndex   int
+	CreatedBy     int64
+	LootGenerated bool
+	SoulsApplied  bool
+	Units         []Unit
+	Loot          []LootRow
 }
 
 func (b *Battle) Active() bool {
@@ -70,7 +75,9 @@ type Unit struct {
 	BattleID         int64
 	Kind             string
 	CharacterID      int64
+	CompanionID      int64
 	CatalogMonsterID int64
+	OwnerUserID      int64
 	Name             string
 	Initiative       int
 	HPCurrent        int
@@ -91,6 +98,8 @@ type Unit struct {
 	SortOrder        int
 	ResistJSON       string
 	SourceURLRU      string
+	CR               float64
+	CRLabel          string
 	Effects          []rules.Effect
 }
 
@@ -99,8 +108,20 @@ func (u Unit) ArticleURL() string {
 	return strings.TrimSpace(u.SourceURLRU)
 }
 
-func (u Unit) IsPC() bool      { return u.Kind == KindPC }
-func (u Unit) IsMonster() bool { return u.Kind == KindMonster }
+func (u Unit) IsPC() bool        { return u.Kind == KindPC }
+func (u Unit) IsMonster() bool   { return u.Kind == KindMonster }
+func (u Unit) IsCompanion() bool { return u.Kind == KindCompanion }
+func (u Unit) IsSummon() bool    { return u.Kind == KindSummon }
+func (u Unit) IsFollower() bool  { return u.IsCompanion() || u.IsSummon() }
+
+func (u Unit) ShowPlayerHP() bool { return u.IsPC() || u.IsFollower() }
+
+func (u Unit) CanCombatHP(isDM bool, userID int64) bool {
+	if isDM {
+		return true
+	}
+	return u.ShowPlayerHP() && u.OwnerUserID != 0 && u.OwnerUserID == userID
+}
 
 func (u Unit) Able() bool {
 	return !u.Dead && !u.Escaped
@@ -240,7 +261,7 @@ type GroupStats struct {
 	Resist    ResistSnapshot
 }
 
-// Stats is the end-of-fight tally (no loot).
+// Stats is the end-of-fight tally. Loot lives on Battle.Loot.
 type Stats struct {
 	PCAlive        int
 	PCDead         int
@@ -259,6 +280,8 @@ func (b *Battle) ComputeStats() Stats {
 	st.Units = b.Units
 	for _, u := range b.Units {
 		switch {
+		case u.IsFollower():
+			// Allies are not encounter tallies.
 		case u.Escaped:
 			if u.IsPC() {
 				st.PCEscaped++

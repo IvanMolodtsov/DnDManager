@@ -1,0 +1,43 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "battle.summon" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('summon-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "battle.summon.note" }}</p>
+  {{template "error" .}}
+  {{if .SummonUnit}}
+    <div class="mt-3 grid gap-3 sm:grid-cols-3">
+      <label class="block text-sm">
+        <span>{{ t "battle.summon.spell" }}</span>
+        <select id="summon-spell" class="input" name="spell"
+                hx-get="/campaigns/{{.Campaign.ID}}/battle/units/{{.SummonUnit.ID}}/summon/search"
+                hx-include="#summon-q,#summon-cr"
+                hx-target="#summon-results" hx-swap="innerHTML">
+          <option value="">{{ t "battle.summon.spell.pick" }}</option>
+          {{range .ConjureSpells}}
+            <option value="{{.}}" {{if eq . $.SummonSpell}}selected{{end}}>{{.}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span>{{ t "battle.search" }}</span>
+        <input id="summon-q" class="input" type="search" name="q" value="{{.Query}}"
+               hx-get="/campaigns/{{.Campaign.ID}}/battle/units/{{.SummonUnit.ID}}/summon/search"
+               hx-include="#summon-spell,#summon-cr"
+               hx-trigger="keyup changed delay:300ms, search"
+               hx-target="#summon-results" hx-swap="innerHTML" autocomplete="off">
+      </label>
+      <label class="block text-sm">
+        <span>{{ t "battle.cr" }}</span>
+        <select id="summon-cr" class="input" name="cr"
+                hx-get="/campaigns/{{.Campaign.ID}}/battle/units/{{.SummonUnit.ID}}/summon/search"
+                hx-include="#summon-spell,#summon-q"
+                hx-target="#summon-results" hx-swap="innerHTML">
+          <option value="">{{ t "battle.cr.any" }}</option>
+          {{range .CRs}}<option value="{{.}}" {{if eq . $.CR}}selected{{end}}>{{.}}</option>{{end}}
+        </select>
+      </label>
+    </div>
+    <div id="summon-results" class="mt-3">{{template "battles/summon_results.html" .}}</div>
+  {{end}}
+</div>

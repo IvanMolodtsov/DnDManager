@@ -25,6 +25,15 @@
 <dialog id="status-add-modal" class="sheet-dialog item-dialog">
   <div id="status-add-body"></div>
 </dialog>
+<dialog id="add-monsters-modal" class="sheet-dialog item-dialog">
+  <div id="add-monsters-body"></div>
+</dialog>
+<dialog id="summon-modal" class="sheet-dialog item-dialog">
+  <div id="summon-body"></div>
+</dialog>
+<dialog id="loot-add-modal" class="sheet-dialog item-dialog">
+  <div id="loot-add-body"></div>
+</dialog>
 
 <script>
   document.body.addEventListener('htmx:afterSwap', function (e) {
@@ -49,6 +58,22 @@
       var d = document.getElementById('status-add-modal');
       if (d) d.showModal();
     }
+    if (e.detail.target.id === 'add-monsters-body') {
+      var d = document.getElementById('add-monsters-modal');
+      if (d) d.showModal();
+    }
+    if (e.detail.target.id === 'summon-body') {
+      var d = document.getElementById('summon-modal');
+      if (d) d.showModal();
+    }
+    if (e.detail.target.id === 'loot-add-body') {
+      var d = document.getElementById('loot-add-modal');
+      if (d) d.showModal();
+    }
+  });
+  document.body.addEventListener('close-loot-modal', function () {
+    var d = document.getElementById('loot-add-modal');
+    if (d) d.close();
   });
   (function () {
     var id = {{.Campaign.ID}};

@@ -16,13 +16,13 @@ type Repository struct {
 
 func (r *Repository) FindByCampaign(campaignID int64) (*Battle, error) {
 	return scanBattle(r.DB.QueryRow(`
-		SELECT id, campaign_id, status, round, active_index, created_by
+		SELECT id, campaign_id, status, round, active_index, created_by, loot_generated, souls_applied
 		FROM battles WHERE campaign_id = ?`, campaignID))
 }
 
 func (r *Repository) Find(id int64) (*Battle, error) {
 	return scanBattle(r.DB.QueryRow(`
-		SELECT id, campaign_id, status, round, active_index, created_by
+		SELECT id, campaign_id, status, round, active_index, created_by, loot_generated, souls_applied
 		FROM battles WHERE id = ?`, id))
 }
 
@@ -38,8 +38,8 @@ func (r *Repository) Insert(campaignID, createdBy int64, status string) (int64, 
 
 func (r *Repository) Update(b *Battle) error {
 	_, err := r.DB.Exec(`
-		UPDATE battles SET status = ?, round = ?, active_index = ? WHERE id = ?`,
-		b.Status, b.Round, b.ActiveIndex, b.ID)
+		UPDATE battles SET status = ?, round = ?, active_index = ?, loot_generated = ?, souls_applied = ? WHERE id = ?`,
+		b.Status, b.Round, b.ActiveIndex, btoi(b.LootGenerated), btoi(b.SoulsApplied), b.ID)
 	return err
 }
 
@@ -50,9 +50,9 @@ func (r *Repository) Delete(id int64) error {
 
 func (r *Repository) ListUnits(battleID int64) ([]Unit, error) {
 	rows, err := r.DB.Query(`
-		SELECT id, battle_id, kind, COALESCE(character_id, 0), COALESCE(catalog_monster_id, 0),
+		SELECT id, battle_id, kind, COALESCE(character_id, 0), COALESCE(companion_id, 0), COALESCE(catalog_monster_id, 0),
 		       name, initiative, hp_current, hp_max, temp_hp, ac, str, dex, con, intel, wis, cha,
-		       death_success, death_fail, dead, escaped, knocked, sort_order, resist_json, source_url_ru
+		       death_success, death_fail, dead, escaped, knocked, sort_order, resist_json, source_url_ru, cr, cr_label
 		FROM battle_units WHERE battle_id = ?
 		ORDER BY sort_order, id`, battleID)
 	if err != nil {
@@ -72,9 +72,9 @@ func (r *Repository) ListUnits(battleID int64) ([]Unit, error) {
 
 func (r *Repository) Unit(id int64) (*Unit, error) {
 	u, err := scanUnit(r.DB.QueryRow(`
-		SELECT id, battle_id, kind, COALESCE(character_id, 0), COALESCE(catalog_monster_id, 0),
+		SELECT id, battle_id, kind, COALESCE(character_id, 0), COALESCE(companion_id, 0), COALESCE(catalog_monster_id, 0),
 		       name, initiative, hp_current, hp_max, temp_hp, ac, str, dex, con, intel, wis, cha,
-		       death_success, death_fail, dead, escaped, knocked, sort_order, resist_json, source_url_ru
+		       death_success, death_fail, dead, escaped, knocked, sort_order, resist_json, source_url_ru, cr, cr_label
 		FROM battle_units WHERE id = ?`, id))
 	if err != nil {
 		return nil, err
@@ -85,13 +85,13 @@ func (r *Repository) Unit(id int64) (*Unit, error) {
 func (r *Repository) InsertUnit(u *Unit) (int64, error) {
 	res, err := r.DB.Exec(`
 		INSERT INTO battle_units (
-			battle_id, kind, character_id, catalog_monster_id, name, initiative,
+			battle_id, kind, character_id, companion_id, catalog_monster_id, name, initiative,
 			hp_current, hp_max, temp_hp, ac, str, dex, con, intel, wis, cha,
-			death_success, death_fail, dead, escaped, knocked, sort_order, resist_json, source_url_ru
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.BattleID, u.Kind, nullIfZero(u.CharacterID), nullIfZero(u.CatalogMonsterID), u.Name, u.Initiative,
+			death_success, death_fail, dead, escaped, knocked, sort_order, resist_json, source_url_ru, cr, cr_label
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.BattleID, u.Kind, nullIfZero(u.CharacterID), nullIfZero(u.CompanionID), nullIfZero(u.CatalogMonsterID), u.Name, u.Initiative,
 		u.HPCurrent, u.HPMax, u.TempHP, u.AC, u.STR, u.DEX, u.CON, u.INT, u.WIS, u.CHA,
-		u.DeathSuccess, u.DeathFail, btoi(u.Dead), btoi(u.Escaped), btoi(u.Knocked), u.SortOrder, u.ResistJSON, u.SourceURLRU,
+		u.DeathSuccess, u.DeathFail, btoi(u.Dead), btoi(u.Escaped), btoi(u.Knocked), u.SortOrder, u.ResistJSON, u.SourceURLRU, u.CR, nz(u.CRLabel, "0"),
 	)
 	if err != nil {
 		return 0, err
@@ -105,13 +105,18 @@ func (r *Repository) UpdateUnit(u *Unit) error {
 			name = ?, initiative = ?, hp_current = ?, hp_max = ?, temp_hp = ?, ac = ?,
 			str = ?, dex = ?, con = ?, intel = ?, wis = ?, cha = ?,
 			death_success = ?, death_fail = ?, dead = ?, escaped = ?, knocked = ?, sort_order = ?,
-			resist_json = ?, source_url_ru = ?
+			resist_json = ?, source_url_ru = ?, cr = ?, cr_label = ?
 		WHERE id = ?`,
 		u.Name, u.Initiative, u.HPCurrent, u.HPMax, u.TempHP, u.AC,
 		u.STR, u.DEX, u.CON, u.INT, u.WIS, u.CHA,
 		u.DeathSuccess, u.DeathFail, btoi(u.Dead), btoi(u.Escaped), btoi(u.Knocked), u.SortOrder,
-		u.ResistJSON, u.SourceURLRU, u.ID,
+		u.ResistJSON, u.SourceURLRU, u.CR, nz(u.CRLabel, "0"), u.ID,
 	)
+	return err
+}
+
+func (r *Repository) DeleteUnit(id int64) error {
+	_, err := r.DB.Exec(`DELETE FROM battle_units WHERE id = ?`, id)
 	return err
 }
 
@@ -140,19 +145,22 @@ type rowScanner interface {
 
 func scanBattle(row rowScanner) (*Battle, error) {
 	b := &Battle{}
-	if err := row.Scan(&b.ID, &b.CampaignID, &b.Status, &b.Round, &b.ActiveIndex, &b.CreatedBy); err != nil {
+	var lootGen, soulsApplied int
+	if err := row.Scan(&b.ID, &b.CampaignID, &b.Status, &b.Round, &b.ActiveIndex, &b.CreatedBy, &lootGen, &soulsApplied); err != nil {
 		return nil, err
 	}
+	b.LootGenerated = lootGen != 0
+	b.SoulsApplied = soulsApplied != 0
 	return b, nil
 }
 
 func scanUnit(row rowScanner) (Unit, error) {
 	var u Unit
 	var dead, escaped, knocked int
-	if err := row.Scan(&u.ID, &u.BattleID, &u.Kind, &u.CharacterID, &u.CatalogMonsterID, &u.Name,
+	if err := row.Scan(&u.ID, &u.BattleID, &u.Kind, &u.CharacterID, &u.CompanionID, &u.CatalogMonsterID, &u.Name,
 		&u.Initiative, &u.HPCurrent, &u.HPMax, &u.TempHP, &u.AC,
 		&u.STR, &u.DEX, &u.CON, &u.INT, &u.WIS, &u.CHA, &u.DeathSuccess, &u.DeathFail,
-		&dead, &escaped, &knocked, &u.SortOrder, &u.ResistJSON, &u.SourceURLRU); err != nil {
+		&dead, &escaped, &knocked, &u.SortOrder, &u.ResistJSON, &u.SourceURLRU, &u.CR, &u.CRLabel); err != nil {
 		return Unit{}, err
 	}
 	u.Dead = dead != 0
@@ -160,6 +168,9 @@ func scanUnit(row rowScanner) (Unit, error) {
 	u.Knocked = knocked != 0
 	if strings.TrimSpace(u.ResistJSON) == "" {
 		u.ResistJSON = "{}"
+	}
+	if strings.TrimSpace(u.CRLabel) == "" {
+		u.CRLabel = "0"
 	}
 	return u, nil
 }

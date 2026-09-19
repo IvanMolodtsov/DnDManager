@@ -67,6 +67,10 @@ func (h *VitalsHub) Broadcast(charID int64) {
 	}
 }
 
+func (s *Service) BroadcastVitals(charID int64) {
+	s.broadcastVitals(charID)
+}
+
 func (s *Service) broadcastVitals(charID int64) {
 	if s == nil || s.Events == nil {
 		return

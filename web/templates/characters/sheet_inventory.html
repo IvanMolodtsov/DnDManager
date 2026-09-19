@@ -1,4 +1,4 @@
-<div id="sheet-inventory" hx-on:close-item-modal="document.getElementById('item-add-modal').close()">
+<div id="sheet-inventory"{{if .OOBInventory}} hx-swap-oob="true"{{end}} hx-on:close-item-modal="document.getElementById('item-add-modal').close()">
 <section class="card mb-6">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
@@ -19,6 +19,51 @@
       {{ t .Error }}{{if .ConflictName}}: {{.ConflictName}}{{end}}
     </p>
   {{end}}
+
+  <div class="inv-list mt-4">
+    <div class="inv-row">
+      <div>
+        <span class="inv-slot">{{ t "character.gold" }}</span>
+        <strong class="text-gold">{{.Character.Gold}}</strong>
+        <span class="text-xs text-parchment/50">{{ t "character.gold.unit" }}</span>
+      </div>
+      {{if or .IsOwner .IsDM}}
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" class="ability-save-btn"
+                  hx-get="/characters/{{.Character.ID}}/gold/adjust?sign=-"
+                  hx-target="#wallet-body" hx-swap="innerHTML"
+                  hx-on::after-request="document.getElementById('wallet-modal').showModal()">−</button>
+          <button type="button" class="ability-save-btn"
+                  hx-get="/characters/{{.Character.ID}}/gold/adjust?sign=%2B"
+                  hx-target="#wallet-body" hx-swap="innerHTML"
+                  hx-on::after-request="document.getElementById('wallet-modal').showModal()">+</button>
+        </div>
+      {{end}}
+    </div>
+    <div class="inv-row">
+      <div>
+        <span class="inv-slot">{{ t "character.souls" }}</span>
+        <strong class="text-gold">{{.Character.Souls}}</strong>
+        <span class="text-xs text-parchment/50">/ {{.Character.SoulsCap}}</span>
+      </div>
+      {{if .IsDM}}
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" class="ability-save-btn"
+                  hx-get="/characters/{{.Character.ID}}/souls/adjust?sign=-"
+                  hx-target="#wallet-body" hx-swap="innerHTML"
+                  hx-on::after-request="document.getElementById('wallet-modal').showModal()">−</button>
+          <button type="button" class="ability-save-btn"
+                  hx-get="/characters/{{.Character.ID}}/souls/adjust?sign=%2B"
+                  hx-target="#wallet-body" hx-swap="innerHTML"
+                  hx-on::after-request="document.getElementById('wallet-modal').showModal()">+</button>
+          <button type="button" class="btn-ghost"
+                  hx-get="/characters/{{.Character.ID}}/souls/cap"
+                  hx-target="#wallet-body" hx-swap="innerHTML"
+                  hx-on::after-request="document.getElementById('wallet-modal').showModal()">{{ t "character.souls.cap" }}</button>
+        </div>
+      {{end}}
+    </div>
+  </div>
 
   <h3 class="mt-4 font-display text-gold">{{ t "character.inventory.equipped" }}</h3>
   {{if .Equipped}}
