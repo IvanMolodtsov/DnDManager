@@ -64,3 +64,4 @@
 .type-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:1rem}
 .type-grid .btn-gold,.type-grid .btn-ghost{width:100%}
 .base-meta{font-size:.85rem;color:hsla(41,64%,87%,.75)}
+.hp-note{font-size:.875rem;color:#d4b45a}

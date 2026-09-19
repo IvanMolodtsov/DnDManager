@@ -16,14 +16,14 @@ Keep this file and `.cursor/rules/project-context.mdc` in sync when product beha
 
 Spring-style **DTO / Service / Repository / Controller** under `internal/{platform,users,campaigns,catalog,rules,characters}` plus stubs `items` / `abilities`. Templates in `web/templates`.
 
-Sheet HTMX islands: `#sheet-stats` (abilities/skills), `#sheet-magic` (resources/spells), `#sheet-vitals` (defense + statuses), `#sheet-inventory` (equipped / pack / consumables). Spell/check/weapon-attack modal is `#spell-use-modal`. Item add wizard is `#item-add-modal`. Casting a spell or equipping/using an item swaps the island and OOB-updates `#sheet-vitals` (equip also OOB-updates `#sheet-stats` and `#sheet-magic` for grants).
+Sheet HTMX islands: `#sheet-stats` (abilities/skills), `#sheet-magic` (resources/spells), `#sheet-vitals` (defense + statuses), `#sheet-inventory` (equipped / pack / consumables). Spell/check/weapon-attack modal is `#spell-use-modal`. HP/temp damage and heal modal is `#hp-adjust-modal`. Item add wizard is `#item-add-modal`. Casting a spell or equipping/using an item swaps the island and OOB-updates `#sheet-vitals` (equip also OOB-updates `#sheet-stats` and `#sheet-magic` for grants). After HP/temp apply, the submitter swaps from the POST (OOB `#sheet-vitals`); other viewers with `CanView` refresh `#sheet-vitals` over **SSE** (`GET /characters/{id}/events`, EventSource → `GET /characters/{id}/vitals`).
 
 ## Access
 
 - Open registration. First registered user is **Admin**.
 - **DM is campaign-scoped**: the campaign creator is DM of that campaign (not a global role).
 - Join via invite codes.
-- Players edit their own characters; DM view is **read-only for now**.
+- Players edit their own characters. Campaign DM may edit HP, temp HP, death saves, and remove statuses; other sheet mutations stay owner-only. Fellow players cannot edit.
 
 ## Character wizard
 
@@ -88,8 +88,8 @@ Draft until confirm:
 
 ## Combat / statuses
 
-- **Defense** (`sheet_combat.html`): current HP ±, **temp HP** total, derived **AC**, **speed**, death-save pips, short **resistance/immunity** line from equipped features. Death saves clear when current HP > 0.
-- **Statuses** (`sheet_statuses.html`): separate block — name, numeric formula, duration, source (`spell` / `potion` / `ability` / `other`), **Remove**.
+- **Defense** (`sheet_combat.html`): current HP and **temp HP** ± open a **modal** (`#hp-adjust-modal`; do not step by 1 on the button). HP − is typed damage (PHB types): equipped item **immunity → 0**, **resistance → half (round down)**, **vulnerability → double**; resist+vuln cancel (×1). **RAW temp HP first** (`ReduceStackedTemp`), remainder hits current HP. HP + heals current HP only (clamp to HPMax, no temp restore). Temp ± is an amount only (no type, no resist; `AdjustTempHP` / `other-temp`). Owner or campaign DM (`RequireCombatEdit`); viewers without edit do not get ±. Death-save pips, derived **AC** / **speed**, short **resistance/immunity** line from equipped features. Death saves clear when current HP > 0. Apply result (e.g. “10 slashing, resistance, 5 applied”) shows in the modal; `#sheet-vitals` refreshes for owner and DM via **SSE**.
+- **Statuses** (`sheet_statuses.html`): separate block — name, numeric formula, duration, source (`spell` / `potion` / `ability` / `other`), **Remove** (owner or campaign DM).
 - **House rule:** temp HP from **different sources stack**. Recasting the **same** spell slug refreshes that row. Manual temp ± uses an `other-temp` status.
 - AC/speed: unarmored (10+DEX, Monk UD, Barbarian UD, Monk unarmored movement) plus **worn armor/shield** and statuses. Light +DEX, medium +min(DEX, cap), heavy no DEX, shield +2. Monk UD off if armor or shield; Barb UD off if armor (shield OK). Mage Armor `ACBase` ignored while wearing armor. Instance AC/speed overlays stack. Duration is **displayed**, not ticked down. **Numeric equipment bonuses to skills/saves still TODO.**
 

@@ -25,6 +25,7 @@ type Service struct {
 	Campaigns *campaigns.Service
 	Catalog   *catalog.Service
 	Rules     *rules.Engine
+	Events    *VitalsHub
 }
 
 func (s *Service) Get(id int64) (*Character, error) {
@@ -71,7 +72,7 @@ func (s *Service) ListByCampaign(campaignID int64) ([]campaigns.CharacterSummary
 	return out, nil
 }
 
-// CanView allows the owner (editable) or the campaign DM (read-only).
+// CanView allows the owner (editable) or the campaign DM (combat-only mutations).
 func (s *Service) CanView(ch *Character, userID int64) (readonly bool, err error) {
 	if ch.OwnerID == userID {
 		return false, nil
@@ -87,6 +88,17 @@ func (s *Service) RequireOwner(ch *Character, userID int64) error {
 		return ErrNotOwner
 	}
 	return nil
+}
+
+// RequireCombatEdit allows the owner or the campaign DM to change vitals and statuses.
+func (s *Service) RequireCombatEdit(ch *Character, userID int64) error {
+	if ch.OwnerID == userID {
+		return nil
+	}
+	if s.Campaigns.IsDM(ch.CampaignID, userID) {
+		return nil
+	}
+	return ErrForbidden
 }
 
 func (s *Service) EnsureDraft(ownerID, campaignID int64) (*Draft, error) {
@@ -515,6 +527,10 @@ func ErrorKey(err error) string {
 		return "error.item.attune"
 	case errors.Is(err, rules.ErrItemNotHeld):
 		return "error.item.missing"
+	case errors.Is(err, rules.ErrAmount):
+		return "error.hp.amount"
+	case errors.Is(err, rules.ErrDamageType):
+		return "error.hp.damage_type"
 	default:
 		return "error.generic"
 	}
@@ -1172,11 +1188,54 @@ func (s *Service) saveVitals(ch *Character) error {
 	if ch.HPCurrent > 0 {
 		ch.DeathSuccess, ch.DeathFail = 0, 0
 	}
-	return s.Repo.UpdateVitals(ch.ID, ch.HPCurrent, ch.HPTemp, ch.DeathSuccess, ch.DeathFail)
+	return s.persistVitals(ch)
+}
+
+func (s *Service) persistVitals(ch *Character) error {
+	if err := s.Repo.UpdateVitals(ch.ID, ch.HPCurrent, ch.HPTemp, ch.DeathSuccess, ch.DeathFail); err != nil {
+		return err
+	}
+	s.broadcastVitals(ch.ID)
+	return nil
+}
+
+func (s *Service) ApplyHPDamage(ch *Character, userID int64, amount int, dmgType string) (rules.DamageResult, error) {
+	if err := s.RequireCombatEdit(ch, userID); err != nil {
+		return rules.DamageResult{}, err
+	}
+	if amount < 1 {
+		return rules.DamageResult{}, rules.ErrAmount
+	}
+	if !rules.ValidDamageType(dmgType) {
+		return rules.DamageResult{}, rules.ErrDamageType
+	}
+	res := rules.ApplyDamage(ch.HPCurrent, ch.HPMax, ch.Effects, ch.EquippedGrants(), amount, dmgType)
+	ch.HPCurrent = res.NewHP
+	if res.AbsorbedTemp > 0 || len(res.NewEffects) != len(ch.Effects) {
+		if err := s.replaceEffects(ch, res.NewEffects); err != nil {
+			return res, err
+		}
+		return res, nil
+	}
+	if err := s.saveVitals(ch); err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func (s *Service) ApplyHPHeal(ch *Character, userID int64, amount int) error {
+	if err := s.RequireCombatEdit(ch, userID); err != nil {
+		return err
+	}
+	if amount < 1 {
+		return rules.ErrAmount
+	}
+	ch.HPCurrent = rules.ClampHP(ch.HPCurrent+amount, ch.HPMax)
+	return s.saveVitals(ch)
 }
 
 func (s *Service) AdjustHP(ch *Character, ownerID int64, delta int) error {
-	if err := s.RequireOwner(ch, ownerID); err != nil {
+	if err := s.RequireCombatEdit(ch, ownerID); err != nil {
 		return err
 	}
 	ch.HPCurrent = rules.ClampHP(ch.HPCurrent+delta, ch.HPMax)
@@ -1184,7 +1243,7 @@ func (s *Service) AdjustHP(ch *Character, ownerID int64, delta int) error {
 }
 
 func (s *Service) AdjustTempHP(ch *Character, ownerID int64, delta int) error {
-	if err := s.RequireOwner(ch, ownerID); err != nil {
+	if err := s.RequireCombatEdit(ch, ownerID); err != nil {
 		return err
 	}
 	list := append([]rules.Effect{}, ch.Effects...)
@@ -1208,7 +1267,7 @@ func (s *Service) AdjustTempHP(ch *Character, ownerID int64, delta int) error {
 }
 
 func (s *Service) ToggleDeath(ch *Character, ownerID int64, fail bool, pip int) error {
-	if err := s.RequireOwner(ch, ownerID); err != nil {
+	if err := s.RequireCombatEdit(ch, ownerID); err != nil {
 		return err
 	}
 	if fail {
@@ -1216,11 +1275,11 @@ func (s *Service) ToggleDeath(ch *Character, ownerID int64, fail bool, pip int) 
 	} else {
 		ch.DeathSuccess = rules.ToggleDeathPip(ch.DeathSuccess, pip)
 	}
-	return s.Repo.UpdateVitals(ch.ID, ch.HPCurrent, ch.HPTemp, ch.DeathSuccess, ch.DeathFail)
+	return s.persistVitals(ch)
 }
 
 func (s *Service) DismissEffect(ch *Character, ownerID, effectID int64) error {
-	if err := s.RequireOwner(ch, ownerID); err != nil {
+	if err := s.RequireCombatEdit(ch, ownerID); err != nil {
 		return err
 	}
 	if err := s.Repo.DeleteEffect(ch.ID, effectID); err != nil {

@@ -1,6 +1,7 @@
 package characters
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -38,6 +39,7 @@ func testSvc(t *testing.T) (*Service, int64, int64) {
 		Campaigns: &campaigns.Service{Repo: campRepo},
 		Catalog:   cat,
 		Rules:     &rules.Engine{Catalog: cat},
+		Events:    NewVitalsHub(),
 	}
 	return svc, uid, cid
 }
@@ -223,5 +225,91 @@ func TestTempHPStacksAcrossSources(t *testing.T) {
 	got, _ = svc.Get(ch.ID)
 	if rules.SumTempHP(got.Effects) != 7 {
 		t.Fatalf("after dismiss sum %d %+v", rules.SumTempHP(got.Effects), got.Effects)
+	}
+}
+
+func TestDMCanEditCombatNotInventory(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	userRepo := &users.Repository{DB: svc.Repo.DB}
+	playerID, err := userRepo.Create(&users.User{Username: "player", PasswordHash: "x", Role: users.RolePlayer, Language: "en"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	camp, err := svc.Campaigns.Get(cid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Campaigns.Join(camp.InviteCode, playerID); err != nil {
+		t.Fatal(err)
+	}
+	outsiderID, err := userRepo.Create(&users.User{Username: "outsider", PasswordHash: "x", Role: users.RolePlayer, Language: "en"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ch := insertLeveled(t, svc, playerID, cid, "Hero", 2, 1)
+
+	if err := svc.AdjustHP(ch, dmID, -3); err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Get(ch.ID)
+	if ch.HPCurrent != 17 {
+		t.Fatalf("dm hp %d", ch.HPCurrent)
+	}
+
+	if err := svc.AdjustTempHP(ch, dmID, 4); err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Get(ch.ID)
+	if ch.HPTemp != 4 {
+		t.Fatalf("dm temp %d", ch.HPTemp)
+	}
+
+	if err := svc.ToggleDeath(ch, dmID, true, 1); err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Get(ch.ID)
+	if ch.DeathFail != 1 {
+		t.Fatalf("dm death fail %d", ch.DeathFail)
+	}
+
+	if len(ch.Effects) == 0 {
+		t.Fatal("expected temp status for dismiss")
+	}
+	if err := svc.DismissEffect(ch, dmID, ch.Effects[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Get(ch.ID)
+	if len(ch.Effects) != 0 {
+		t.Fatalf("dm dismiss leftover %+v", ch.Effects)
+	}
+
+	leather, err := svc.Catalog.ItemBySlug("leather-armor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AddItem(ch, dmID, AddItemInput{CatalogID: leather.ID}); !errors.Is(err, ErrNotOwner) {
+		t.Fatalf("dm AddItem: %v", err)
+	}
+	it, err := svc.AddItem(ch, playerID, AddItemInput{CatalogID: leather.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Get(ch.ID)
+	if err := svc.EquipItem(ch, dmID, it.ID, "armor"); !errors.Is(err, ErrNotOwner) {
+		t.Fatalf("dm Equip: %v", err)
+	}
+
+	if err := svc.AdjustHP(ch, outsiderID, -1); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("outsider AdjustHP: %v", err)
+	}
+	if err := svc.AdjustTempHP(ch, outsiderID, 1); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("outsider AdjustTempHP: %v", err)
+	}
+	if err := svc.ToggleDeath(ch, outsiderID, false, 1); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("outsider ToggleDeath: %v", err)
+	}
+	if err := svc.DismissEffect(ch, outsiderID, 1); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("outsider DismissEffect: %v", err)
 	}
 }

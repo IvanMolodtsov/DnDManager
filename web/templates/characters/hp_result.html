@@ -1,0 +1,9 @@
+{{if eq .HPResult.Kind "damage"}}
+  {{.HPResult.Incoming}} {{.HPResult.TypeName}}{{if .HPResult.ModKey}}, {{ t .HPResult.ModKey }}{{end}}, {{.HPResult.Applied}} {{ t "character.hp.applied" }}{{if .HPResult.Absorbed}}, {{.HPResult.Absorbed}} {{ t "character.hp.absorbed_temp" }}{{end}}
+{{else if eq .HPResult.Kind "heal"}}
+  {{ t "character.hp.healed" }} {{.HPResult.Amount}}
+{{else if eq .HPResult.Kind "temp_up"}}
+  {{ t "character.hp.temp_added" }} {{.HPResult.Amount}}
+{{else if eq .HPResult.Kind "temp_down"}}
+  {{ t "character.hp.temp_reduced" }} {{.HPResult.Amount}}
+{{end}}

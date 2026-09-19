@@ -49,6 +49,19 @@ func (c *Controller) ownerSheet(w http.ResponseWriter, r *http.Request) (*Charac
 	return ch, true
 }
 
+func (c *Controller) combatSheet(w http.ResponseWriter, r *http.Request) (*Character, bool) {
+	ch, ok := c.loadLive(w, r)
+	if !ok {
+		return nil, false
+	}
+	u := platform.UserFrom(r.Context())
+	if err := c.Svc.RequireCombatEdit(ch, u.ID); err != nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, false
+	}
+	return ch, true
+}
+
 func (c *Controller) renderMagic(w http.ResponseWriter, r *http.Request, ch *Character, readonly bool) {
 	v := c.sheetView(r, ch, readonly)
 	c.Render.Render(w, "characters/sheet_magic.html", v.Lang, http.StatusOK, v)
