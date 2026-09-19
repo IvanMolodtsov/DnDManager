@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "functions": {
+    "api/index.go": {
+      "maxDuration": 300,
+      "includeFiles": [
+        "{web,locales,migrations}/**",
+        "../{web,locales,migrations}/**"
+      ]
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api" }
+  ]
+}

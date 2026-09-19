@@ -1,8 +1,9 @@
-/data/*.db
-/data/*.db-shm
-/data/*.db-wal
+/data/
 /node_modules/
 /tmp/
 *.exe
 *.exe~
 .env
+.env.local
+.env.*.local
+.vercel

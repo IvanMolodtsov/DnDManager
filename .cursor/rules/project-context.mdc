@@ -118,6 +118,15 @@ Draft until confirm:
 - Campaign SSE event `battle` refreshes `#battle-board`. PC sheet vitals keep per-character SSE (same event also refreshes `#sheet-inventory` for gold/souls and `#sheet-mutations`).
 - **Companions** persist on `character_companions` (not `characters`). Sheet island `#sheet-companions`: owner build; DM read-only except combat HP. Gating: Ranger **Beast Master** (subclass in `018`, ranger level ≥ 3) one beast CR ≤ 1/4 Medium or smaller; **Find Familiar** known/prepared/grant or feature `pact-of-the-chain` (PHB list; Chain extras may attack); equipped figurine / dancing sword / `grant_companion`. No catalog “golem stones” — use the feature hook. Battle units `kind=companion` share the master’s initiative and sort immediately after (stable `companion_id`). HP like PCs (everyone sees it); CR/scores/resist stay DM-only. Owner or campaign DM `RequireCombatEdit` for companion HP. **Conjure** (animals / woodland beings / minor elementals / elemental / celestial) is battle-only `kind=summon` after the caster; not persisted; gone when the fight ends. No Wild Shape, no freeform pets.
 
+## Vercel (prepared, not deployed)
+
+- **No Node.** Config is `vercel.json` (`framework: null`), not `vercel.ts` / `package.json`. Do not add the Tailwind Play CDN.
+- Entrypoint: `api/index.go` `Handler` wraps `app.New()` (same mux as `go run ./cmd/web`). Fluid Compute default; **do not** set Edge runtime. SSE stays (`/characters/{id}/events`, `/campaigns/{id}/battle/events`). `maxDuration` **300s** (platform default; connections drop at the cap, EventSource retries). In-process vitals/battle hubs are per instance — fine for a small table; no Redis yet.
+- Bundle: `includeFiles` copies `web/`, `locales/`, `migrations/` next to the Go function. `platform.AssetDir` walks cwd/parents. Local run still uses repo-root relative paths.
+- **Database:** Vercel’s filesystem is ephemeral. Local Air: `DATA_DIR` (default `data`) → `data/dnd.db` via `modernc.org/sqlite`. Hosted: set `DATABASE_URL` or `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` to Marketplace **Turso** (SQLite-compatible). Repositories stay on `database/sql`. **Paused:** do not `vercel integration add turso`, login, link, or deploy until Ivan says so (paid Marketplace DB). After provision: `go get turso.tech/database/tursogo-serverless` and wire it in `platform.OpenFromEnv` (pure Go HTTP driver, no CGO, no Postgres rewrite). Until then a remote DSN fails fast with that message instead of writing a throwaway local file on the function.
+- Env placeholders: `.env.example`. Session cookie is a random id in SQLite (no `SESSION_SECRET`). `Secure` when `VERCEL=1` or `COOKIE_SECURE=1`. CSRF stays per-session in the DB.
+- Do not commit `.vercel/`, `data/`, or `.cursor/mcp.json`.
+
 ## Data
 
 - Migrations `001`–`020` (`020` = `character_mutations` + `character_mutation_features`). `data/` is not in git. Do not commit `.cursor/mcp.json`.

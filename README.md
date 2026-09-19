@@ -16,8 +16,15 @@ Windows: `./start.ps1` or `scripts/start.ps1` (Air hot reload — restarts when 
 
 | Env | Default | |
 | --- | --- | --- |
-| `ADDR` | `:8080` | Listen address |
-| `DATA_DIR` | `data` | SQLite directory (`dnd.db`) |
+| `ADDR` | `:8080` | Listen address (`PORT` is used only if `ADDR` is unset, for Vercel) |
+| `DATA_DIR` | `data` | SQLite directory (`dnd.db`) when no remote URL is set |
+| `DATABASE_URL` / `TURSO_DATABASE_URL` | (unset) | Persistent libSQL/Turso DSN for Vercel. Local file fallback otherwise. See `.env.example` and AGENTS.md. |
+| `TURSO_AUTH_TOKEN` | (unset) | Turso auth token (secret — Vercel env, never git) |
+| `COOKIE_SECURE` | off locally; on when `VERCEL=1` | Session cookie `Secure` flag |
+
+Copy `.env.example` for names only. `.env` / `.env.local` are gitignored. **Do not commit `data/` or secrets.**
+
+Hosting on Vercel is prepared (`vercel.json`, `api/index.go`) but not deployed. SQLite on the function disk is ephemeral — provision Marketplace Turso before going live (paused; see AGENTS.md).
 
 Open http://localhost:8080. The first registered user is **Admin**; later accounts are players.
 
