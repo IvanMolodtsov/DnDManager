@@ -1,0 +1,90 @@
+<label class="block text-sm">
+  <span>{{ t "character.mutation.stat" }}</span>
+  <select class="input" name="stat" required>
+    <option value="ability_bonus">{{ t "character.mutation.stat.ability_bonus" }}</option>
+    <option value="ability_penalty">{{ t "character.mutation.stat.ability_penalty" }}</option>
+    <option value="skill_bonus">{{ t "character.mutation.stat.skill_bonus" }}</option>
+    <option value="skill_penalty">{{ t "character.mutation.stat.skill_penalty" }}</option>
+    <option value="size">{{ t "character.mutation.stat.size" }}</option>
+    <option value="resistance">{{ t "character.mutation.stat.resistance" }}</option>
+    <option value="immunity">{{ t "character.mutation.stat.immunity" }}</option>
+    <option value="vulnerability">{{ t "character.mutation.stat.vulnerability" }}</option>
+    <option value="condition_immunity">{{ t "character.mutation.stat.condition_immunity" }}</option>
+    <option value="condition_vulnerability">{{ t "character.mutation.stat.condition_vulnerability" }}</option>
+    <option value="grant_weapon">{{ t "character.mutation.stat.grant_weapon" }}</option>
+    <option value="grant_spell">{{ t "character.mutation.stat.grant_spell" }}</option>
+    <option value="grant_cantrip">{{ t "character.mutation.stat.grant_cantrip" }}</option>
+    <option value="block_slot">{{ t "character.mutation.stat.block_slot" }}</option>
+    <option value="hands">{{ t "character.mutation.stat.hands" }}</option>
+    <option value="add_part">{{ t "character.mutation.stat.add_part" }}</option>
+    <option value="remove_part">{{ t "character.mutation.stat.remove_part" }}</option>
+  </select>
+</label>
+<div class="grid gap-2 sm:grid-cols-2">
+  <label class="block text-sm">
+    <span>{{ t "ability.STR" }}</span>
+    <select class="input" name="ability">
+      {{range .AbilityKeys}}<option value="{{.}}">{{ t (printf "ability.%s" .) }}</option>{{end}}
+    </select>
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.mutation.amount" }}</span>
+    <input class="input" type="number" name="amount" value="1">
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.skills" }}</span>
+    <select class="input" name="skill">
+      {{range .Skills}}<option value="{{.Slug}}">{{if .NameEN}}{{.NameEN}}{{else}}{{.Name}}{{end}}</option>{{end}}
+    </select>
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.mutation.stat.size" }}</span>
+    <select class="input" name="size_value">
+      {{range .Sizes}}<option value="{{.}}">{{ t (printf "character.mutation.size.%s" .) }}</option>{{end}}
+    </select>
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.hp.damage_type" }}</span>
+    <select class="input" name="damage_type">
+      {{range .DamageTypes}}<option value="{{.Slug}}">{{.Name $.Lang}}</option>{{end}}
+    </select>
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.status.effect" }}</span>
+    <select class="input" name="condition">
+      {{range .Conditions}}<option value="{{.Slug}}">{{.Name $.Lang}}</option>{{end}}
+    </select>
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.mutation.attack.name" }}</span>
+    <input class="input" type="text" name="name" placeholder="{{ t "character.mutation.attack.ph" }}">
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.mutation.dice" }}</span>
+    <input class="input" type="text" name="dice" placeholder="1d8">
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.mutation.spell_id" }}</span>
+    <input class="input" type="number" name="spell_id" min="1">
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.item.slot" }}</span>
+    <select class="input" name="slot">
+      {{range .Slots}}{{if .}}<option value="{{.}}">{{ t (printf "character.item.slot.%s" .) }}</option>{{end}}{{end}}
+    </select>
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.mutation.stat.hands" }}</span>
+    <select class="input" name="hands">
+      <option value="two_hand_and_shield">{{ t "character.mutation.hands.two_hand_and_shield" }}</option>
+      <option value="extra_offhand">{{ t "character.mutation.hands.extra_offhand" }}</option>
+    </select>
+  </label>
+  <label class="block text-sm">
+    <span>{{ t "character.mutation.part" }}</span>
+    <select class="input" name="part">
+      {{range .BodyParts}}<option value="{{.}}">{{ t (printf "character.mutation.part.%s" .) }}</option>{{end}}
+    </select>
+  </label>
+</div>
+<p class="text-xs text-parchment/50">{{ t "character.mutation.feature.hint" }}</p>

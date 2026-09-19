@@ -15,6 +15,11 @@ var (
 	ErrAlreadyMember  = errors.New("already member")
 	ErrNotMember      = errors.New("not member")
 	ErrNotFound       = errors.New("campaign not found")
+	ErrForbidden      = errors.New("forbidden")
+	ErrSoulsCap       = errors.New("invalid souls cap")
+	ErrAmount         = errors.New("amount must be at least 1")
+	ErrReviveSouls    = errors.New("not enough souls to revive")
+	ErrNotDead        = errors.New("character is not dead")
 )
 
 const inviteAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -101,6 +106,54 @@ func (s *Service) Members(campaignID int64) ([]Membership, error) {
 	return s.Repo.Members(campaignID)
 }
 
+func (s *Service) RequireDM(campaignID, userID int64) error {
+	if !s.IsDM(campaignID, userID) {
+		return ErrForbidden
+	}
+	return nil
+}
+
+func (s *Service) SetSouls(id int64, souls, cap int) error {
+	if cap < 1 {
+		cap = DefaultSoulsCap
+	}
+	if souls < 0 {
+		souls = 0
+	}
+	if souls > cap {
+		souls = cap
+	}
+	return s.Repo.UpdateSouls(id, souls, cap)
+}
+
+func (s *Service) AdjustSouls(campaignID, userID int64, delta int) error {
+	if err := s.RequireDM(campaignID, userID); err != nil {
+		return err
+	}
+	if delta == 0 {
+		return ErrAmount
+	}
+	camp, err := s.Get(campaignID)
+	if err != nil {
+		return err
+	}
+	return s.SetSouls(camp.ID, camp.Souls+delta, camp.SoulsCap)
+}
+
+func (s *Service) SetSoulsCap(campaignID, userID int64, cap int) error {
+	if err := s.RequireDM(campaignID, userID); err != nil {
+		return err
+	}
+	if cap < 1 {
+		return ErrSoulsCap
+	}
+	camp, err := s.Get(campaignID)
+	if err != nil {
+		return err
+	}
+	return s.SetSouls(camp.ID, camp.Souls, cap)
+}
+
 func (s *Service) uniqueInvite() (string, error) {
 	for i := 0; i < 8; i++ {
 		code, err := randomInvite(8)
@@ -141,6 +194,16 @@ func ErrorKey(err error) string {
 		return "error.invite.invalid"
 	case errors.Is(err, ErrAlreadyMember):
 		return "error.already.member"
+	case errors.Is(err, ErrSoulsCap):
+		return "error.souls.cap"
+	case errors.Is(err, ErrAmount):
+		return "error.hp.amount"
+	case errors.Is(err, ErrReviveSouls):
+		return "error.character.revive.souls"
+	case errors.Is(err, ErrNotDead):
+		return "error.character.not_dead"
+	case errors.Is(err, ErrForbidden), errors.Is(err, ErrNotMember):
+		return "error.forbidden"
 	default:
 		return "error.generic"
 	}

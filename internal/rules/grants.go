@@ -57,15 +57,30 @@ func Conditions() []NamedOption {
 	}
 }
 
-// ItemGrants is the mechanical overlay derived from equipped item features.
+// ItemGrants is the mechanical overlay derived from equipped item / mutation features.
 type ItemGrants struct {
 	Ability         AbilityScores
 	Skills          []string
+	SkillBonus      map[string]int
 	Resistances     []string
 	Immunities      []string
 	Vulnerabilities []string
 	Conditions      []string
+	ConditionVuln   []string
 	SpellIDs        []int64
+	BlockedSlots    []string
+	Hands           HandsRules
+	Size            string
+	Attacks         []MutationAttack
+	RemovedParts    []string
+	AddedParts      []string
+}
+
+func (g ItemGrants) SkillBonusOf(slug string) int {
+	if g.SkillBonus == nil {
+		return 0
+	}
+	return g.SkillBonus[strings.ToLower(slug)]
 }
 
 func (g ItemGrants) HasSkill(slug string) bool {
@@ -91,6 +106,9 @@ func (g ItemGrants) DefenseLine() string {
 	}
 	if s := joinUnique(g.Conditions); s != "" {
 		parts = append(parts, "cond. immune "+s)
+	}
+	if s := joinUnique(g.ConditionVuln); s != "" {
+		parts = append(parts, "cond. vuln "+s)
 	}
 	return strings.Join(parts, " · ")
 }
@@ -127,6 +145,41 @@ func GrantsFromFeatures(feats []FeatureDTO) ItemGrants {
 				seenSpell[id] = true
 				g.SpellIDs = append(g.SpellIDs, id)
 			}
+		case StatSkillBonus, StatSkillPenalty:
+			slug, n := ParseSkillValue(f.Value)
+			if slug == "" || n == 0 {
+				continue
+			}
+			if f.Stat == StatSkillPenalty && n > 0 {
+				n = -n
+			}
+			if g.SkillBonus == nil {
+				g.SkillBonus = map[string]int{}
+			}
+			g.SkillBonus[slug] += n
+		case StatSize:
+			if ValidCreatureSize(f.Value) {
+				g.Size = strings.ToLower(strings.TrimSpace(f.Value))
+			}
+		case StatConditionVulnerability:
+			g.ConditionVuln = appendToken(g.ConditionVuln, f.Value)
+		case StatBlockSlot:
+			g.BlockedSlots = appendToken(g.BlockedSlots, f.Value)
+		case StatHands:
+			g.Hands = g.Hands.Merge(ParseHandsValue(f.Value))
+		case StatRemovePart:
+			part := strings.ToLower(strings.TrimSpace(f.Value))
+			g.RemovedParts = appendToken(g.RemovedParts, part)
+			if part == BodyLegs {
+				g.BlockedSlots = appendToken(g.BlockedSlots, SlotBoots)
+			}
+		case StatAddPart:
+			g.AddedParts = appendToken(g.AddedParts, f.Value)
+		case StatGrantWeapon:
+			name, dice, typ := ParseWeaponGrant(f.Value)
+			if name != "" && dice != "" {
+				g.Attacks = append(g.Attacks, MutationAttack{NameEN: name, NameRU: name, Dice: dice, DamageType: typ})
+			}
 		}
 	}
 	return g
@@ -149,6 +202,23 @@ func MergeGrants(dst ItemGrants, src ItemGrants) ItemGrants {
 			seen[id] = true
 		}
 	}
+	if src.SkillBonus != nil {
+		if dst.SkillBonus == nil {
+			dst.SkillBonus = map[string]int{}
+		}
+		for k, n := range src.SkillBonus {
+			dst.SkillBonus[k] += n
+		}
+	}
+	dst.BlockedSlots = mergeUnique(dst.BlockedSlots, src.BlockedSlots)
+	dst.ConditionVuln = mergeUnique(dst.ConditionVuln, src.ConditionVuln)
+	dst.Hands = dst.Hands.Merge(src.Hands)
+	if src.Size != "" {
+		dst.Size = src.Size
+	}
+	dst.Attacks = append(dst.Attacks, src.Attacks...)
+	dst.RemovedParts = mergeUnique(dst.RemovedParts, src.RemovedParts)
+	dst.AddedParts = mergeUnique(dst.AddedParts, src.AddedParts)
 	return dst
 }
 

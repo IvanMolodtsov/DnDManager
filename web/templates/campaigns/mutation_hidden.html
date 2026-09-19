@@ -1,0 +1,7 @@
+<input type="hidden" name="cr" value="{{.CR}}">
+<input type="hidden" name="size" value="{{.Size}}">
+<input type="hidden" name="type" value="{{.Type}}">
+<input type="hidden" name="size_face" value="{{.SizeFace}}">
+<input type="hidden" name="type_face" value="{{.TypeFace}}">
+{{if .Monster}}<input type="hidden" name="monster_id" value="{{.Monster.ID}}">{{end}}
+{{if .BodyPart}}<input type="hidden" name="body_part" value="{{.BodyPart}}">{{end}}

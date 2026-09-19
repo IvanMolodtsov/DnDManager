@@ -1,0 +1,10 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "battle.add.monsters" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('add-monsters-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  <p class="mt-1 text-xs text-parchment/50">{{ t "battle.add.monsters.note" }}</p>
+  {{template "error" .}}
+  {{template "battles/monster_search.html" .}}
+  {{template "battles/monster_roster.html" .}}
+</div>

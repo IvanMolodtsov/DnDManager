@@ -1,0 +1,63 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">
+      {{if eq .AdjustPool "cap"}}
+        {{ t "character.souls.cap.edit" }}
+      {{else if eq .AdjustPool "souls"}}
+        {{if eq .AdjustSign "-"}}{{ t "character.souls.down" }}{{else}}{{ t "character.souls.up" }}{{end}}
+      {{else}}
+        {{if eq .AdjustSign "-"}}{{ t "character.gold.down" }}{{else}}{{ t "character.gold.up" }}{{end}}
+      {{end}}
+    </h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('wallet-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{template "error" .}}
+  {{if eq .AdjustPool "cap"}}
+    <form class="mt-4 space-y-3"
+          hx-post="/characters/{{.Character.ID}}/souls"
+          hx-target="#sheet-inventory" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+      <input type="hidden" name="pool" value="cap">
+      <label class="block text-sm">
+        <span>{{ t "character.souls.cap" }}</span>
+        <input class="input" type="number" name="amount" min="1" value="{{.Character.SoulsCap}}" required>
+      </label>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn-gold" type="submit">{{ t "common.apply" }}</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('wallet-modal').close()">{{ t "common.cancel" }}</button>
+      </div>
+    </form>
+  {{else if eq .AdjustPool "souls"}}
+    <form class="mt-4 space-y-3"
+          hx-post="/characters/{{.Character.ID}}/souls"
+          hx-target="#sheet-inventory" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+      <input type="hidden" name="sign" value="{{.AdjustSign}}">
+      <label class="block text-sm">
+        <span>{{ t "character.hp.amount" }}</span>
+        <input class="input" type="number" name="amount" min="1" value="{{if .AdjustAmount}}{{.AdjustAmount}}{{else}}1{{end}}" required>
+      </label>
+      <p class="text-xs text-parchment/50">{{ t "character.souls.hint" }}</p>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn-gold" type="submit">{{ t "common.apply" }}</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('wallet-modal').close()">{{ t "common.cancel" }}</button>
+      </div>
+    </form>
+  {{else}}
+    <form class="mt-4 space-y-3"
+          hx-post="/characters/{{.Character.ID}}/gold"
+          hx-target="#sheet-inventory" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+      <input type="hidden" name="sign" value="{{.AdjustSign}}">
+      <label class="block text-sm">
+        <span>{{ t "character.hp.amount" }}</span>
+        <input class="input" type="number" name="amount" min="1" value="{{if .AdjustAmount}}{{.AdjustAmount}}{{else}}1{{end}}" required>
+      </label>
+      <p class="text-xs text-parchment/50">{{ t "character.gold.hint" }}</p>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn-gold" type="submit">{{ t "common.apply" }}</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('wallet-modal').close()">{{ t "common.cancel" }}</button>
+      </div>
+    </form>
+  {{end}}
+</div>

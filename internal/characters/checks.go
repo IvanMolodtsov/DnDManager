@@ -136,10 +136,9 @@ func (c *Controller) checkData(r *http.Request, ch *Character, readonly bool, ki
 		if !ok {
 			return v
 		}
-		mark := ch.EffectiveSkillMark(key)
 		v.Ability = sk.Ability
 		v.Label = catalog.Pick(platform.LangFrom(r.Context()), sk.NameEN, sk.NameRU)
-		v.Bonus = rules.SkillBonus(ch.Scores(), ch.Level, mark)
+		v.Bonus = ch.SkillCheckBonus(key)
 		v.Formula = rules.CheckFormula(v.Bonus)
 		return v
 	}

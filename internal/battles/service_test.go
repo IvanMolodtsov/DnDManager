@@ -351,7 +351,7 @@ func TestMemberSeesNamesNotMonsterHP(t *testing.T) {
 	if !strings.Contains(body, "HP 20/20") {
 		t.Fatalf("player should see PC HP:\n%s", body)
 	}
-	if strings.Contains(body, "Next unit") || strings.Contains(body, "End battle") {
+	if strings.Contains(body, "Next unit") || strings.Contains(body, "End battle") || strings.Contains(body, "Add monsters") || strings.Contains(body, "Search monsters") {
 		t.Fatalf("player should not get DM controls:\n%s", body)
 	}
 
@@ -981,3 +981,518 @@ func TestHubBroadcast(t *testing.T) {
 		t.Fatal("expected battle signal")
 	}
 }
+
+func TestInitiativeFormulaUsesDEXModifier(t *testing.T) {
+	cases := []struct {
+		dex  int
+		want string
+	}{
+		{14, "1d20+2"},
+		{10, "1d20+0"},
+		{8, "1d20-1"},
+		{1, "1d20-5"},
+		{20, "1d20+5"},
+	}
+	for _, tc := range cases {
+		if got := initiativeFormula(tc.dex); got != tc.want {
+			t.Fatalf("DEX %d: got %s want %s", tc.dex, got, tc.want)
+		}
+	}
+}
+
+func TestRollInitiativeUsesDEXModifier(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	insertPC(t, svc, dmID, cid, "Hero")
+	if _, err := svc.Start(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	gid := goblinID(t, svc)
+	if _, err := svc.AddMonsters(cid, dmID, gid, 1, "en"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := svc.BeginInitiative(cid, dmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gob *Unit
+	for i := range b.Units {
+		if b.Units[i].IsMonster() {
+			gob = &b.Units[i]
+			break
+		}
+	}
+	if gob == nil || gob.DEX != 14 {
+		t.Fatalf("goblin %+v", gob)
+	}
+	res, _, err := svc.RollInitiative(cid, dmID, gob.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Formula != "1d20+2" {
+		t.Fatalf("formula %s", res.Formula)
+	}
+	if res.Total < 3 || res.Total > 22 {
+		t.Fatalf("1d20+2 out of range %d", res.Total)
+	}
+}
+
+func TestRollInitiativeNegativeDEXMod(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	insertPC(t, svc, dmID, cid, "Hero")
+	if _, err := svc.Start(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	gid := goblinID(t, svc)
+	m, err := svc.Catalog.Monster(gid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AddMonsters(cid, dmID, gid, 1, "en"); err != nil {
+		t.Fatal(err)
+	}
+	scores := scoresFromMonster(m)
+	scores.DEX = 8
+	if _, err := svc.UpdateMonsterGroupStats(cid, dmID, gid, GroupStats{
+		HPCurrent: m.FightHP(), HPMax: m.FightHP(), AC: m.FightAC(), Scores: scores,
+		Resist: ParseSnapshot(snapshotFromMonster(m)),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := svc.BeginInitiative(cid, dmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gob *Unit
+	for i := range b.Units {
+		if b.Units[i].IsMonster() {
+			gob = &b.Units[i]
+			break
+		}
+	}
+	res, _, err := svc.RollInitiative(cid, dmID, gob.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Formula != "1d20-1" {
+		t.Fatalf("formula %s", res.Formula)
+	}
+	if res.Total < 0 || res.Total > 19 {
+		t.Fatalf("1d20-1 out of range %d", res.Total)
+	}
+}
+
+func TestRollMonsterInitiativesLeavesPCs(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	insertPC(t, svc, dmID, cid, "Hero")
+	if _, err := svc.Start(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AddMonsters(cid, dmID, goblinID(t, svc), 2, "en"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := svc.BeginInitiative(cid, dmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pcUnit *Unit
+	for i := range b.Units {
+		if b.Units[i].IsPC() {
+			pcUnit = &b.Units[i]
+			break
+		}
+	}
+	if _, err := svc.SetInitiative(cid, dmID, pcUnit.ID, 12); err != nil {
+		t.Fatal(err)
+	}
+	b, err = svc.RollMonsterInitiatives(cid, dmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	monsters := 0
+	for _, u := range b.Units {
+		if u.IsPC() {
+			if u.Initiative != 12 {
+				t.Fatalf("PC initiative changed %d", u.Initiative)
+			}
+			continue
+		}
+		monsters++
+		if u.DEX != 14 {
+			t.Fatalf("goblin dex %+v", u)
+		}
+		if u.Initiative < 3 || u.Initiative > 22 {
+			t.Fatalf("bulk 1d20+2 out of range %+v", u)
+		}
+	}
+	if monsters != 2 {
+		t.Fatalf("monsters %d", monsters)
+	}
+}
+
+func TestAddMonstersDuringFight(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	pc := insertPC(t, svc, dmID, cid, "Hero")
+	b := fightingWithTwoGoblins(t, svc, dmID, cid, pc)
+	if _, err := svc.Next(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	b, err := svc.GetForCampaign(cid, dmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	active := b.ActiveUnit()
+	if active == nil || !active.IsMonster() {
+		t.Fatalf("expected goblin acting %+v", active)
+	}
+	activeID := active.ID
+	round := b.Round
+	before := map[int64]bool{}
+	pcs, monsters := 0, 0
+	for _, u := range b.Units {
+		before[u.ID] = true
+		if u.IsPC() {
+			pcs++
+		} else {
+			monsters++
+		}
+	}
+	b, err = svc.AddMonsters(cid, dmID, goblinID(t, svc), 2, "en")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Status != StatusFighting {
+		t.Fatalf("status %s", b.Status)
+	}
+	if b.Round != round {
+		t.Fatalf("round changed %d -> %d", round, b.Round)
+	}
+	gotActive := b.ActiveUnit()
+	if gotActive == nil || gotActive.ID != activeID {
+		t.Fatalf("active changed %+v want %d", gotActive, activeID)
+	}
+	pcsAfter, monstersAfter := 0, 0
+	var prevInit *int
+	for _, u := range b.Units {
+		if u.IsPC() {
+			pcsAfter++
+		} else {
+			monstersAfter++
+		}
+		if !before[u.ID] {
+			if !u.IsMonster() {
+				t.Fatalf("new unit should be monster %+v", u)
+			}
+			if u.Initiative < 3 || u.Initiative > 22 {
+				t.Fatalf("new unit missing 1d20+DEX %+v", u)
+			}
+			if u.HPMax != 7 {
+				t.Fatalf("should inherit goblin snapshot %+v", u)
+			}
+		}
+		if prevInit != nil && u.Initiative > *prevInit {
+			t.Fatalf("not sorted desc %+v", b.Units)
+		}
+		v := u.Initiative
+		prevInit = &v
+	}
+	if pcsAfter != pcs || pcsAfter != 1 {
+		t.Fatalf("PCs %d -> %d (should not re-add)", pcs, pcsAfter)
+	}
+	if monstersAfter != monsters+2 {
+		t.Fatalf("monsters %d -> %d", monsters, monstersAfter)
+	}
+}
+
+func TestAddMonstersRejectedDuringInitiative(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	insertPC(t, svc, dmID, cid, "Hero")
+	if _, err := svc.Start(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AddMonsters(cid, dmID, goblinID(t, svc), 1, "en"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.BeginInitiative(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AddMonsters(cid, dmID, goblinID(t, svc), 1, "en"); !errors.Is(err, ErrWrongStatus) {
+		t.Fatalf("want ErrWrongStatus, got %v", err)
+	}
+}
+
+func TestAddMonstersModalDMOnly(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	pc := insertPC(t, svc, dmID, cid, "Hero")
+	fightingWithTwoGoblins(t, svc, dmID, cid, pc)
+
+	userRepo := &users.Repository{DB: svc.Repo.DB}
+	playerID, err := userRepo.Create(&users.User{Username: "player", PasswordHash: "x", Role: users.RolePlayer, Language: "en"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	camp, err := svc.Campaigns.Get(cid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Campaigns.Join(camp.InviteCode, playerID); err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &Controller{Svc: svc, Campaigns: svc.Campaigns, Characters: svc.Characters, Catalog: svc.Catalog, Render: render}
+	cidStr := strconv.FormatInt(cid, 10)
+	auth := func(id int64, name string) func(*http.Request) *http.Request {
+		return func(r *http.Request) *http.Request {
+			r.SetPathValue("id", cidStr)
+			return r.WithContext(platform.WithUser(r.Context(), &platform.AuthUser{
+				ID: id, Username: name, Role: users.RolePlayer, Language: "en",
+			}))
+		}
+	}
+
+	dmShow := httptest.NewRequest(http.MethodGet, "/campaigns/"+cidStr+"/battle", nil)
+	dmShow = auth(dmID, "dm")(dmShow)
+	rec := httptest.NewRecorder()
+	c.show(rec, dmShow)
+	dmBody := rec.Body.String()
+	if rec.Code != http.StatusOK || strings.Contains(dmBody, "template error") {
+		t.Fatalf("dm show %d %s", rec.Code, dmBody)
+	}
+	if !strings.Contains(dmBody, "Add monsters") || !strings.Contains(dmBody, "/battle/monsters/add") {
+		t.Fatalf("dm fight missing add control:\n%s", dmBody)
+	}
+
+	modal := httptest.NewRequest(http.MethodGet, "/campaigns/"+cidStr+"/battle/monsters/add", nil)
+	modal = auth(dmID, "dm")(modal)
+	rec = httptest.NewRecorder()
+	c.addMonstersModal(rec, modal)
+	form := rec.Body.String()
+	if rec.Code != http.StatusOK || strings.Contains(form, "template error") {
+		t.Fatalf("modal %d %s", rec.Code, form)
+	}
+	if !strings.Contains(form, `id="monster-search-q"`) || !strings.Contains(form, "delay:300ms") {
+		t.Fatalf("expected debounced search:\n%s", form)
+	}
+	if !strings.Contains(form, `id="monster-search-type"`) || !strings.Contains(form, "Any type") {
+		t.Fatalf("expected type filter:\n%s", form)
+	}
+	if !strings.Contains(form, "Goblin") || !strings.Contains(form, "Edit") {
+		t.Fatalf("expected roster in modal:\n%s", form)
+	}
+
+	playerShow := httptest.NewRequest(http.MethodGet, "/campaigns/"+cidStr+"/battle", nil)
+	playerShow = auth(playerID, "player")(playerShow)
+	rec = httptest.NewRecorder()
+	c.show(rec, playerShow)
+	playerBody := rec.Body.String()
+	if strings.Contains(playerBody, "/battle/monsters/add") || strings.Contains(playerBody, "Search monsters") || strings.Contains(playerBody, `id="monster-search-q"`) {
+		t.Fatalf("player saw add-monster UI:\n%s", playerBody)
+	}
+
+	playerModal := httptest.NewRequest(http.MethodGet, "/campaigns/"+cidStr+"/battle/monsters/add", nil)
+	playerModal = auth(playerID, "player")(playerModal)
+	rec = httptest.NewRecorder()
+	c.addMonstersModal(rec, playerModal)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("player modal %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestSetupInitShowsBulkMonsterRoll(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	insertPC(t, svc, dmID, cid, "Hero")
+	if _, err := svc.Start(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AddMonsters(cid, dmID, goblinID(t, svc), 1, "en"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.BeginInitiative(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &Controller{Svc: svc, Campaigns: svc.Campaigns, Characters: svc.Characters, Catalog: svc.Catalog, Render: render}
+	cidStr := strconv.FormatInt(cid, 10)
+	r := httptest.NewRequest(http.MethodGet, "/campaigns/"+cidStr+"/battle", nil)
+	r.SetPathValue("id", cidStr)
+	r = r.WithContext(platform.WithUser(r.Context(), &platform.AuthUser{
+		ID: dmID, Username: "dm", Role: users.RolePlayer, Language: "en",
+	}))
+	rec := httptest.NewRecorder()
+	c.show(rec, r)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || strings.Contains(body, "template error") {
+		t.Fatalf("show %d %s", rec.Code, body)
+	}
+	if !strings.Contains(body, "Auto-calculate all monsters") || !strings.Contains(body, "/battle/initiative/monsters") {
+		t.Fatalf("expected bulk monster init:\n%s", body)
+	}
+}
+
+func rangerWithWolf(t *testing.T, svc *Service, uid, cid int64) *characters.Character {
+	t.Helper()
+	ch := &characters.Character{
+		Name: "Ranger", OwnerID: uid, CampaignID: cid, Level: 3,
+		STR: 12, DEX: 16, CON: 13, INT: 10, WIS: 14, CHA: 8,
+		RaceID: 1, BackgroundID: 1, HPMax: 24, HPCurrent: 24, ProficiencyBonus: 2,
+	}
+	id, err := svc.Characters.Repo.InsertLive(ch, []rules.ClassProgress{{ClassID: 9, Levels: 3, SubclassID: 16}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.Characters.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wolf, err := svc.Catalog.MonsterBySlug("wolf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Characters.AddCompanion(got, uid, characters.AddCompanionInput{Kind: characters.KindBeast, CatalogMonsterID: wolf.ID}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = svc.Characters.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+func TestCompanionInitiativeAfterMaster(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	ranger := rangerWithWolf(t, svc, dmID, cid)
+	if _, err := svc.Start(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AddMonsters(cid, dmID, goblinID(t, svc), 1, "en"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.BeginInitiative(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	b, err := svc.GetForCampaign(cid, dmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pc, wolf, gob *Unit
+	for i := range b.Units {
+		u := &b.Units[i]
+		switch {
+		case u.IsPC() && u.CharacterID == ranger.ID:
+			pc = u
+		case u.IsCompanion():
+			wolf = u
+		case u.IsMonster():
+			gob = u
+		}
+	}
+	if pc == nil || wolf == nil || gob == nil {
+		t.Fatalf("units %+v", b.Units)
+	}
+	if _, err := svc.SetInitiative(cid, dmID, pc.ID, 20); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.SetInitiative(cid, dmID, gob.ID, 15); err != nil {
+		t.Fatal(err)
+	}
+	b, err = svc.ConfirmInitiative(cid, dmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.Units) < 3 {
+		t.Fatalf("units %d", len(b.Units))
+	}
+	if !b.Units[0].IsPC() || b.Units[0].CharacterID != ranger.ID {
+		t.Fatalf("master first %+v", b.Units[0])
+	}
+	if !b.Units[1].IsCompanion() || b.Units[1].CharacterID != ranger.ID {
+		t.Fatalf("companion after master %+v", b.Units[1])
+	}
+	if b.Units[0].Initiative != b.Units[1].Initiative {
+		t.Fatalf("shared init %d vs %d", b.Units[0].Initiative, b.Units[1].Initiative)
+	}
+}
+
+func TestConjureNotPersisted(t *testing.T) {
+	svc, dmID, cid := testSvc(t)
+	ch := insertPC(t, svc, dmID, cid, "Druid")
+	spell, err := svc.Catalog.SpellBySlug("conjure-animals")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Characters.Repo.UpsertCharacterSpell(ch.ID, spell.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Characters.Get(ch.ID)
+	if len(characters.GateCompanions(ch).Conjure) == 0 {
+		t.Fatal("expected conjure-animals")
+	}
+	wolf, err := svc.Catalog.MonsterBySlug("wolf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Start(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.BeginInitiative(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	b, err := svc.GetForCampaign(cid, dmID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pc *Unit
+	for i := range b.Units {
+		if b.Units[i].IsPC() {
+			pc = &b.Units[i]
+			break
+		}
+	}
+	if _, err := svc.SetInitiative(cid, dmID, pc.ID, 12); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ConfirmInitiative(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	b, err = svc.AddSummon(cid, dmID, ch.ID, wolf.ID, 2, "conjure-animals", "en")
+	if err != nil {
+		t.Fatal(err)
+	}
+	summons := 0
+	for _, u := range b.Units {
+		if u.IsSummon() {
+			summons++
+			if u.CharacterID != ch.ID {
+				t.Fatalf("summon owner %+v", u)
+			}
+		}
+	}
+	if summons != 2 {
+		t.Fatalf("summons %d units %+v", summons, b.Units)
+	}
+	ch, _ = svc.Characters.Get(ch.ID)
+	if len(ch.Companions) != 0 {
+		t.Fatalf("conjure persisted %+v", ch.Companions)
+	}
+	if _, err := svc.End(cid, dmID); err != nil {
+		t.Fatal(err)
+	}
+	ch, _ = svc.Characters.Get(ch.ID)
+	if len(ch.Companions) != 0 {
+		t.Fatalf("after end %+v", ch.Companions)
+	}
+}
+
