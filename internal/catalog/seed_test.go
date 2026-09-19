@@ -202,8 +202,8 @@ func TestPHBSeedAndWizardOptions(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM catalog_subclasses`).Scan(&classCount); err != nil {
 		t.Fatal(err)
 	}
-	if classCount != 15 {
-		t.Fatalf("subclasses %d want 15", classCount)
+	if classCount != 16 {
+		t.Fatalf("subclasses %d want 16 (PHB + Beast Master)", classCount)
 	}
 	if err := db.QueryRow(`SELECT COUNT(*) FROM catalog_features`).Scan(&raceCount); err != nil {
 		t.Fatal(err)
@@ -329,7 +329,7 @@ func TestMonsterCatalogGoblinAndSearch(t *testing.T) {
 	if gob.SourceURLRU == "" || !strings.Contains(gob.SourceURLRU, "5e14.dnd.su/bestiary/") {
 		t.Fatalf("goblin 5e14 URL %s", gob.SourceURLRU)
 	}
-	ru, err := svc.SearchMonsters("ГОБЛИН", "", 10)
+	ru, err := svc.SearchMonsters("ГОБЛИН", "", "", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +342,7 @@ func TestMonsterCatalogGoblinAndSearch(t *testing.T) {
 	if !found {
 		t.Fatalf("Cyrillic goblin search: %+v", ru)
 	}
-	cr, err := svc.SearchMonsters("", "1/4", 40)
+	cr, err := svc.SearchMonsters("", "1/4", "", 40)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,7 +374,7 @@ func TestMonsterCatalogGoblinAndSearch(t *testing.T) {
 	if spider.CRLabel != "11" {
 		t.Fatalf("spiderdragon CR %s", spider.CRLabel)
 	}
-	spSearch, err := svc.SearchMonsters("SPIDERDRAGON", "", 10)
+	spSearch, err := svc.SearchMonsters("SPIDERDRAGON", "", "", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +387,7 @@ func TestMonsterCatalogGoblinAndSearch(t *testing.T) {
 	if !found {
 		t.Fatalf("Spiderdragon search: %+v", spSearch)
 	}
-	cr11, err := svc.SearchMonsters("spider", "11", 20)
+	cr11, err := svc.SearchMonsters("spider", "11", "", 20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,6 +402,60 @@ func TestMonsterCatalogGoblinAndSearch(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("CR 11 search should include spiderdragon")
+	}
+	types, err := svc.ListMonsterTypes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	have := map[string]bool{}
+	for _, opt := range types {
+		have[opt.Slug] = true
+	}
+	for _, need := range []string{"aberration", "beast", "celestial", "construct", "dragon", "elemental", "fey", "fiend", "giant", "humanoid", "monstrosity", "ooze", "plant", "undead"} {
+		if !have[need] {
+			t.Fatalf("missing PHB type %s in %+v", need, types)
+		}
+	}
+	humans, err := svc.SearchMonsters("", "", "humanoid", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, m := range humans {
+		if m.Type != "humanoid" {
+			t.Fatalf("type filter leaked %s", m.Type)
+		}
+		if m.Slug == "goblin" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("humanoid filter should include goblin")
+	}
+	combo, err := svc.SearchMonsters("", "1/4", "humanoid", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = false
+	for _, m := range combo {
+		if m.Type != "humanoid" || m.CRLabel != "1/4" {
+			t.Fatalf("type+CR leaked %+v", m)
+		}
+		if m.Slug == "goblin" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("type+CR should include goblin")
+	}
+	wrong, err := svc.SearchMonsters("ГОБЛИН", "", "dragon", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range wrong {
+		if m.Slug == "goblin" {
+			t.Fatal("dragon filter should not return goblin")
+		}
 	}
 }
 
@@ -448,6 +502,35 @@ func TestPHBConditionsSeed(t *testing.T) {
 	ru, err := svc.SearchConditions("ОТРАВ", 10)
 	if err != nil || len(ru) == 0 || ru[0].Slug != "poisoned" {
 		t.Fatalf("unicode search %+v %v", ru, err)
+	}
+}
+
+func TestLootMagicByRarityExcludesBases(t *testing.T) {
+	dir := t.TempDir()
+	db, err := platform.OpenDB(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	svc := &Service{Repo: &Repository{DB: db}}
+	uncommon, err := svc.LootMagicByRarity("uncommon")
+	if err != nil || len(uncommon) == 0 {
+		t.Fatalf("uncommon pool %d %v", len(uncommon), err)
+	}
+	for _, it := range uncommon {
+		if !it.LootMagicEligible() || it.IsBase || it.IsJewelrySlotBase() || it.IsSpellScroll() {
+			t.Fatalf("bad uncommon loot item %s", it.Slug)
+		}
+	}
+	arts, err := svc.LootMagicByRarity("artifact")
+	if err != nil || len(arts) == 0 {
+		t.Fatalf("artifact pool %d %v", len(arts), err)
+	}
+	if n := len(PHBTreasures()); n < 10 {
+		t.Fatalf("encoded treasures %d", n)
 	}
 }
 

@@ -64,6 +64,7 @@ func main() {
 		Events:     battles.NewHub(),
 	}
 	charSvc.OnCampaign = battleSvc.Events.Broadcast
+	charSvc.OnCompanionChange = battleSvc.SyncCompanions
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))

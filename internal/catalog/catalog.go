@@ -184,6 +184,36 @@ func (i Item) IsMagic() bool {
 	return i.IsStub || i.Rarity != ""
 }
 
+func NormalizeRarity(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.ReplaceAll(s, "_", " ")
+	s = strings.ReplaceAll(s, "-", " ")
+	s = strings.Join(strings.Fields(s), " ")
+	return s
+}
+
+func (i Item) IsSpellScroll() bool {
+	slug := strings.ToLower(i.Slug)
+	name := strings.ToLower(i.NameEN)
+	return strings.Contains(slug, "spell-scroll") || strings.Contains(name, "spell scroll")
+}
+
+func (i Item) IsJewelrySlotBase() bool {
+	return i.IsBase && i.IsJewelry()
+}
+
+func (i Item) LootMagicEligible() bool {
+	if i.IsBase || i.IsJewelrySlotBase() || i.IsSpellScroll() {
+		return false
+	}
+	switch NormalizeRarity(i.Rarity) {
+	case "uncommon", "rare", "very rare", "legendary", "artifact":
+		return true
+	default:
+		return false
+	}
+}
+
 func (i Item) IsShield() bool {
 	return strings.EqualFold(i.ArmorCategory, "shield") || i.HasProperty("shield") || i.SuggestedSlot == "shield"
 }

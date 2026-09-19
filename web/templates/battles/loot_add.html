@@ -1,0 +1,20 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "battle.loot.add_item" }}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('loot-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{template "error" .}}
+  <p class="mt-1 text-xs text-parchment/50">{{ t "battle.loot.search.note" }}</p>
+  <label class="block mt-3 text-sm">
+    <span>{{ t "character.inventory.search" }}</span>
+    <input id="loot-search-q" class="input" type="search" name="q" value="{{.LootQuery}}" placeholder="{{ t "battle.loot.search.ph" }}"
+           hx-get="/campaigns/{{.Campaign.ID}}/battle/loot/items/search"
+           hx-trigger="keyup changed delay:300ms, search"
+           hx-target="#loot-search-results" hx-swap="innerHTML"
+           autocomplete="off"
+           autofocus>
+  </label>
+  <div id="loot-search-results">
+    {{template "battles/loot_search_results.html" .}}
+  </div>
+</div>

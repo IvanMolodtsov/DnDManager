@@ -41,7 +41,7 @@ const characterSelect = `
 		SELECT ch.id, ch.name, ch.owner_id, u.username, ch.campaign_id, c.name, ch.level,
 		       ch.str, ch.dex, ch.con, ch.intel, ch.wis, ch.cha, ch.created_at,
 		       ch.race_id, ch.background_id, ch.hp_max, ch.hp_current, ch.hp_temp,
-		       ch.death_success, ch.death_fail, ch.proficiency_bonus
+		       ch.death_success, ch.death_fail, ch.proficiency_bonus, ch.gold, c.souls, c.souls_cap
 		FROM characters ch
 		JOIN users u ON u.id = ch.owner_id
 		JOIN campaigns c ON c.id = ch.campaign_id`
@@ -251,10 +251,14 @@ func scanCharacterRow(row scanner) (*Character, error) {
 		&ch.ID, &ch.Name, &ch.OwnerID, &ch.OwnerName, &ch.CampaignID, &ch.Campaign, &ch.Level,
 		&ch.STR, &ch.DEX, &ch.CON, &ch.INT, &ch.WIS, &ch.CHA, &created,
 		&raceID, &bgID, &ch.HPMax, &ch.HPCurrent, &ch.HPTemp, &ch.DeathSuccess, &ch.DeathFail, &ch.ProficiencyBonus,
+		&ch.Gold, &ch.Souls, &ch.SoulsCap,
 	); err != nil {
 		return nil, err
 	}
 	ch.RaceID, ch.BackgroundID = raceID.Int64, bgID.Int64
+	if ch.SoulsCap < 1 {
+		ch.SoulsCap = 5000
+	}
 	if t, err := time.ParseInLocation("2006-01-02 15:04:05", created, time.UTC); err == nil {
 		ch.CreatedAt = t
 	}
@@ -439,6 +443,11 @@ func (r *Repository) UpsertSave(characterID int64, ability string, proficient bo
 		VALUES (?, ?, ?)
 		ON CONFLICT(character_id, ability) DO UPDATE SET proficient = excluded.proficient`,
 		characterID, ability, boolInt(proficient))
+	return err
+}
+
+func (r *Repository) UpdateGold(characterID int64, gold int) error {
+	_, err := r.DB.Exec(`UPDATE characters SET gold = ? WHERE id = ?`, gold, characterID)
 	return err
 }
 

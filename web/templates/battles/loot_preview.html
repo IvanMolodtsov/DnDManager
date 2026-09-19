@@ -1,0 +1,28 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{.LootItem.Name .Lang}}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('loot-add-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{template "error" .}}
+  <p class="mt-1 text-sm text-parchment/70">{{.LootItem.Kind}}{{if .LootItem.Rarity}} · {{.LootItem.Rarity}}{{end}}{{$stats := .LootItem.StatsLine}}{{if $stats}} · {{$stats}}{{end}}</p>
+  {{$src14 := .LootItem.Source5e14}}
+  {{if $src14}}
+    <p class="mt-1 text-sm"><a class="text-gold hover:underline" href="{{$src14}}" target="_blank" rel="noopener">{{ t "character.item.open_source" }}</a></p>
+  {{end}}
+  {{$desc := .LootItem.Desc .Lang}}
+  {{if $desc}}
+    <div class="item-desc mt-3">{{$desc}}</div>
+  {{else if .LootItem.IsStub}}
+    <p class="mt-3 text-sm text-parchment/70">{{ t "character.item.stub.note" }}</p>
+  {{end}}
+  <div class="mt-4 flex flex-wrap gap-2">
+    <button class="btn-ghost" type="button"
+            hx-get="/campaigns/{{.Campaign.ID}}/battle/loot/items/new"
+            hx-target="#loot-add-body" hx-swap="innerHTML">{{ t "common.back" }}</button>
+    <form hx-post="/campaigns/{{.Campaign.ID}}/battle/loot/items" hx-target="#battle-board" hx-swap="outerHTML">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <input type="hidden" name="item_id" value="{{.LootItem.ID}}">
+      <button class="btn-gold" type="submit">{{ t "battle.loot.add_item" }}</button>
+    </form>
+  </div>
+</div>

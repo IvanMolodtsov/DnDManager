@@ -330,6 +330,44 @@ func scanStatFeature(row scanner) (StatFeature, error) {
 	return f, err
 }
 
+func (r *Repository) LootMagicByRarity(rarity string) ([]Item, error) {
+	want := NormalizeRarity(rarity)
+	if want == "" {
+		return nil, nil
+	}
+	items, err := r.ListItems()
+	if err != nil {
+		return nil, err
+	}
+	var out []Item
+	for _, it := range items {
+		if it.LootMagicEligible() && NormalizeRarity(it.Rarity) == want {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+func (r *Repository) SpellsInLevelRange(min, max int) ([]Spell, error) {
+	spells, err := r.ListSpells()
+	if err != nil {
+		return nil, err
+	}
+	if min < 0 {
+		min = 0
+	}
+	if max < min {
+		return nil, nil
+	}
+	var out []Spell
+	for _, sp := range spells {
+		if sp.Level >= min && sp.Level <= max {
+			out = append(out, sp)
+		}
+	}
+	return out, nil
+}
+
 func (r *Repository) SearchItems(q string, limit int) ([]Item, error) {
 	if limit <= 0 || limit > 40 {
 		limit = 20
@@ -429,6 +467,18 @@ func matchesFold(needle string, fields ...string) bool {
 		}
 	}
 	return false
+}
+
+func monsterTypeMatches(stored, want string) bool {
+	stored = strings.ToLower(strings.TrimSpace(stored))
+	want = strings.ToLower(strings.TrimSpace(want))
+	if stored == "" || want == "" {
+		return false
+	}
+	if stored == want {
+		return true
+	}
+	return strings.HasPrefix(stored, want+" ") || strings.HasPrefix(stored, want+"(") || strings.HasPrefix(stored, want+" (")
 }
 
 func scanSpells(rows *sql.Rows) ([]Spell, error) {
@@ -603,13 +653,22 @@ func (r *Repository) MonsterBySlug(slug string) (*Monster, error) {
 	return scanMonster(r.DB.QueryRow(monsterSelect+` WHERE slug = ?`, slug))
 }
 
-func (r *Repository) SearchMonsters(q, cr string, limit int) ([]Monster, error) {
-	if limit <= 0 || limit > 40 {
+func (r *Repository) SearchMonsters(q, cr, typ string, limit int) ([]Monster, error) {
+	return r.SearchMonstersFilter(q, cr, typ, "", limit)
+}
+
+func (r *Repository) SearchMonstersFilter(q, cr, typ, size string, limit int) ([]Monster, error) {
+	if limit <= 0 {
 		limit = 20
+	}
+	if limit > 500 {
+		limit = 500
 	}
 	needle := strings.ToLower(strings.TrimSpace(q))
 	cr = strings.TrimSpace(cr)
-	if needle == "" && cr == "" {
+	typ = strings.TrimSpace(typ)
+	size = strings.TrimSpace(size)
+	if needle == "" && cr == "" && typ == "" && size == "" {
 		return nil, nil
 	}
 	rows, err := r.DB.Query(monsterSelect + ` ORDER BY is_stub, cr, name_en`)
@@ -623,6 +682,12 @@ func (r *Repository) SearchMonsters(q, cr string, limit int) ([]Monster, error) 
 	var out []Monster
 	for _, m := range all {
 		if cr != "" && m.CRLabel != cr && fmtCR(m.CR) != cr {
+			continue
+		}
+		if typ != "" && !monsterTypeMatches(m.Type, typ) {
+			continue
+		}
+		if size != "" && !strings.EqualFold(strings.TrimSpace(m.Size), size) {
 			continue
 		}
 		if needle != "" && !matchesFold(needle, m.NameEN, m.NameRU, m.Slug, m.Type) {
@@ -655,6 +720,29 @@ func (r *Repository) ListMonsterCRs() ([]string, error) {
 		}
 		seen[label] = true
 		out = append(out, label)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) ListMonsterTypes() ([]string, error) {
+	rows, err := r.DB.Query(`SELECT DISTINCT type FROM catalog_monsters WHERE type != '' ORDER BY type COLLATE NOCASE`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	seen := map[string]bool{}
+	for rows.Next() {
+		var typ string
+		if err := rows.Scan(&typ); err != nil {
+			return nil, err
+		}
+		typ = strings.TrimSpace(typ)
+		if typ == "" || seen[strings.ToLower(typ)] {
+			continue
+		}
+		seen[strings.ToLower(typ)] = true
+		out = append(out, typ)
 	}
 	return out, rows.Err()
 }

@@ -1,0 +1,66 @@
+<section id="sheet-mutations" class="card mt-6">
+  <h3 class="font-display text-gold">{{ t "character.mutations" }}</h3>
+  {{template "error" .}}
+  {{if .Character.Mutations}}
+    <ul class="mt-3 space-y-3">
+      {{range .Character.Mutations}}
+        {{$mut := .}}
+        <li class="rounded border border-gold/15 px-3 py-2 text-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <strong>{{ t (printf "character.mutation.part.%s" $mut.BodyPart) }}</strong>
+              · {{$mut.Name $.Lang}}
+              {{$src := $mut.ArticleURL}}
+              {{if $src}}
+                · <a class="text-gold hover:underline" href="{{$src}}" target="_blank" rel="noopener">{{ t "battle.edit.article" }}</a>
+              {{end}}
+              <span class="block text-xs text-parchment/50">CR {{$mut.CRLabel}} · {{$mut.Size}} · {{$mut.Type}}</span>
+              {{if $mut.FeatureLine}}<p class="mt-1 font-mono text-xs text-parchment/70">{{$mut.FeatureLine}}</p>{{end}}
+            </div>
+            {{if $.IsDM}}
+              <form hx-post="/characters/{{$.Character.ID}}/mutations/{{$mut.ID}}/remove"
+                    hx-target="#sheet-mutations" hx-swap="outerHTML">
+                <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                <button class="btn-ghost" type="submit">{{ t "common.remove" }}</button>
+              </form>
+            {{end}}
+          </div>
+          {{if $mut.Attacks}}
+            <div class="mt-2 flex flex-wrap gap-2">
+              {{range $i, $at := $mut.Attacks}}
+                <button type="button" class="btn-ghost"
+                        hx-get="/characters/{{$.Character.ID}}/mutations/{{$mut.ID}}/attack?i={{$i}}"
+                        hx-target="#spell-use-body" hx-swap="innerHTML">{{ t "common.use" }} {{$at.Name $.Lang}}</button>
+              {{end}}
+            </div>
+          {{end}}
+          {{if $.IsDM}}
+            <form class="mt-3 space-y-2"
+                  hx-post="/characters/{{$.Character.ID}}/mutations/{{$mut.ID}}/features"
+                  hx-target="#sheet-mutations" hx-swap="outerHTML">
+              <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+              {{template "characters/mutation_feature_fields.html" $}}
+              <button class="btn-gold" type="submit">{{ t "character.mutation.feature.add" }}</button>
+            </form>
+            {{if $mut.Features}}
+              <ul class="mt-2 space-y-1">
+                {{range $mut.Features}}
+                  <li class="flex items-center justify-between gap-2 text-xs">
+                    <span class="font-mono">{{.Stat}} {{.Value}}</span>
+                    <form hx-post="/characters/{{$.Character.ID}}/mutations/{{$mut.ID}}/features/{{.ID}}/remove"
+                          hx-target="#sheet-mutations" hx-swap="outerHTML">
+                      <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+                      <button class="btn-ghost" type="submit">{{ t "common.remove" }}</button>
+                    </form>
+                  </li>
+                {{end}}
+              </ul>
+            {{end}}
+          {{end}}
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="mt-2 text-sm text-parchment/45">{{ t "character.mutations.empty" }}</p>
+  {{end}}
+</section>

@@ -1,0 +1,128 @@
+<div class="sheet-dialog-inner">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="font-display text-xl text-gold">{{ t "character.mutation.add" }}{{if .Character}} — {{.Character.Name}}{{end}}</h2>
+    <button type="button" class="btn-ghost" onclick="document.getElementById('mutation-modal').close()">{{ t "common.close" }}</button>
+  </div>
+  {{template "error" .}}
+
+  {{if eq .Step "features"}}
+    {{if .Mutation}}
+      <p class="mt-2 text-sm text-parchment/70">
+        {{ t (printf "character.mutation.part.%s" .Mutation.BodyPart) }} · {{.Mutation.Name .Lang}}
+        {{$src := .Mutation.ArticleURL}}
+        {{if $src}}
+          · <a class="text-gold hover:underline" href="{{$src}}" target="_blank" rel="noopener">{{ t "battle.edit.article" }}</a>
+        {{end}}
+      </p>
+      {{if .Mutation.Features}}
+        <ul class="mt-3 space-y-1 text-sm">
+          {{range .Mutation.Features}}
+            <li class="font-mono text-parchment/80">{{.Stat}} {{.Value}}</li>
+          {{end}}
+        </ul>
+      {{end}}
+      <form class="mt-4 space-y-3"
+            hx-post="/campaigns/{{.CampaignID}}/characters/{{.Character.ID}}/mutations/{{.Mutation.ID}}/features"
+            hx-target="#mutation-body" hx-swap="innerHTML">
+        <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+        {{template "characters/mutation_feature_fields.html" .}}
+        <div class="flex flex-wrap gap-2">
+          <button class="btn-gold" type="submit">{{ t "character.mutation.feature.add" }}</button>
+          <button type="button" class="btn-ghost" onclick="document.getElementById('mutation-modal').close()">{{ t "common.close" }}</button>
+        </div>
+      </form>
+    {{end}}
+
+  {{else if eq .Step "part"}}
+    <p class="mt-2 text-sm text-parchment/70">
+      {{if .Monster}}{{.Monster.Name .Lang}}{{end}}
+      {{if and .Monster .Monster.ArticleURL}}
+        · <a class="text-gold hover:underline" href="{{.Monster.ArticleURL}}" target="_blank" rel="noopener">{{ t "battle.edit.article" }}</a>
+      {{end}}
+    </p>
+    <form class="mt-4 space-y-3"
+          hx-post="/campaigns/{{.CampaignID}}/characters/{{.Character.ID}}/mutations/roll"
+          hx-target="#mutation-body" hx-swap="innerHTML">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <input type="hidden" name="step" value="part">
+      {{template "campaigns/mutation_hidden.html" .}}
+      <label class="block text-sm">
+        <span>{{ t "character.mutation.part.die" }}</span>
+        <input class="input" type="number" name="body_face" min="1" max="6" value="{{if .BodyFace}}{{.BodyFace}}{{else}}1{{end}}">
+      </label>
+      <button class="btn-ghost" type="submit">{{ t "character.spells.autocalc" }}</button>
+    </form>
+    <form class="mt-4 space-y-3"
+          hx-post="/campaigns/{{.CampaignID}}/characters/{{.Character.ID}}/mutations"
+          hx-target="#mutation-body" hx-swap="innerHTML">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      {{template "campaigns/mutation_hidden.html" .}}
+      <label class="block text-sm">
+        <span>{{ t "character.mutation.part" }}</span>
+        <select class="input" name="body_part" {{if not .BodyChoose}}{{if .BodyPart}}{{end}}{{end}}>
+          <option value="">{{ t "character.mutation.part.choose" }}</option>
+          {{range .BodyParts}}
+            <option value="{{.}}" {{if eq . $.BodyPart}}selected{{end}}>{{ t (printf "character.mutation.part.%s" .) }}</option>
+          {{end}}
+        </select>
+      </label>
+      {{if .BodyChoose}}<p class="text-xs text-parchment/50">{{ t "character.mutation.part.player" }}</p>{{end}}
+      <button class="btn-gold" type="submit">{{ t "common.confirm" }}</button>
+    </form>
+
+  {{else}}
+    <form class="mt-4 space-y-3"
+          hx-post="/campaigns/{{.CampaignID}}/characters/{{.Character.ID}}/mutations/roll"
+          hx-target="#mutation-body" hx-swap="innerHTML">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <input type="hidden" name="step" value="pick">
+      <button class="btn-ghost" type="submit">{{ t "character.spells.autocalc" }}</button>
+    </form>
+    <form class="mt-4 space-y-3"
+          hx-post="/campaigns/{{.CampaignID}}/characters/{{.Character.ID}}/mutations/pick"
+          hx-target="#mutation-body" hx-swap="innerHTML">
+      <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+      <label class="block text-sm">
+        <span>{{ t "character.mutation.cr" }} (0–{{.Character.Level}})</span>
+        <input class="input" type="number" name="cr" min="0" max="{{.Character.Level}}" value="{{.CR}}">
+      </label>
+      <label class="block text-sm">
+        <span>{{ t "character.mutation.size.die" }}</span>
+        <input class="input" type="number" name="size_face" min="1" max="6" value="{{if .SizeFace}}{{.SizeFace}}{{else}}1{{end}}">
+      </label>
+      <label class="block text-sm">
+        <span>{{ t "character.mutation.type.die" }}</span>
+        <input class="input" type="number" name="type_face" min="1" max="15" value="{{if .TypeFace}}{{.TypeFace}}{{else}}1{{end}}">
+      </label>
+      {{if or .TypeChoose (eq .TypeFace 15)}}
+        <label class="block text-sm">
+          <span>{{ t "character.mutation.type.choose" }}</span>
+          <select class="input" name="type">
+            <option value="">{{ t "character.mutation.type.choose" }}</option>
+            {{range .PHBTypes}}
+              <option value="{{.}}" {{if eq . $.Type}}selected{{end}}>{{ t (printf "character.mutation.type.%s" .) }}</option>
+            {{end}}
+          </select>
+        </label>
+      {{end}}
+      <button class="btn-gold" type="submit">{{ t "character.mutation.search" }}</button>
+    </form>
+    {{if .Monster}}
+      <p class="mt-4 text-sm">
+        <strong>{{.Monster.Name .Lang}}</strong>
+        {{if .Monster.ArticleURL}}
+          · <a class="text-gold hover:underline" href="{{.Monster.ArticleURL}}" target="_blank" rel="noopener">{{ t "battle.edit.article" }}</a>
+        {{end}}
+        <span class="block text-xs text-parchment/50">CR {{.Monster.CRLabel}} · {{.Monster.Size}} · {{.Monster.Type}}</span>
+      </p>
+      <form class="mt-3"
+            hx-post="/campaigns/{{.CampaignID}}/characters/{{.Character.ID}}/mutations/pick"
+            hx-target="#mutation-body" hx-swap="innerHTML">
+        <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+        <input type="hidden" name="next" value="part">
+        {{template "campaigns/mutation_hidden.html" .}}
+        <button class="btn-gold" type="submit">{{ t "common.confirm" }}</button>
+      </form>
+    {{end}}
+  {{end}}
+</div>

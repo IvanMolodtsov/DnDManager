@@ -23,6 +23,66 @@
       </li>
     {{end}}
   </ul>
+
+  <h3 class="mt-6 text-sm uppercase tracking-wide text-gold/80">{{ t "battle.loot" }}</h3>
+  {{if .IsDM}}
+    <div class="mt-2 flex flex-wrap gap-2">
+      {{if .Battle.LootGenerated}}
+        <form hx-post="/campaigns/{{.Campaign.ID}}/battle/loot/generate" hx-target="#battle-board" hx-swap="outerHTML">
+          <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+          <button class="btn-gold" type="submit">{{ t "battle.loot.reroll" }}</button>
+        </form>
+      {{else}}
+        <form hx-post="/campaigns/{{.Campaign.ID}}/battle/loot/generate" hx-target="#battle-board" hx-swap="outerHTML">
+          <input type="hidden" name="csrf_token" value="{{.CSRF}}">
+          <button class="btn-gold" type="submit">{{ t "battle.loot.generate" }}</button>
+        </form>
+      {{end}}
+      <button class="btn-ghost" type="button"
+              hx-get="/campaigns/{{.Campaign.ID}}/battle/loot/items/new"
+              hx-target="#loot-add-body" hx-swap="innerHTML"
+              hx-on::after-request="document.getElementById('loot-add-modal').showModal()">
+        {{ t "battle.loot.add_item" }}
+      </button>
+      <button class="btn-ghost" type="button"
+              hx-get="/campaigns/{{.Campaign.ID}}/battle/loot/quest"
+              hx-target="#loot-add-body" hx-swap="innerHTML"
+              hx-on::after-request="document.getElementById('loot-add-modal').showModal()">
+        {{ t "battle.loot.add_quest" }}
+      </button>
+    </div>
+    <p class="mt-1 text-xs text-parchment/50">{{ t "battle.loot.dm.note" }}</p>
+  {{end}}
+
+  {{if .Battle.Loot}}
+    <ul class="inv-list mt-3">
+      {{range .Battle.Loot}}
+        <li class="inv-row">
+          <div>
+            <span class="inv-slot">{{ t (printf "battle.loot.kind.%s" .Kind) }}</span>
+            {{if eq .Kind "gold"}}
+              <span class="text-gold">{{.Qty}} {{ t "character.gold.unit" }}</span>
+            {{else if eq .Kind "souls"}}
+              <span class="text-gold">{{.Qty}} {{ t "character.souls" }}</span>
+            {{else}}
+              <span class="text-gold">{{.Name $.Lang}}</span>
+              {{if gt .Qty 1}}<span class="inv-tag">×{{.Qty}}</span>{{end}}
+              {{if .Rarity}}<p class="text-xs text-parchment/60">{{.Rarity}}</p>{{end}}
+            {{end}}
+          </div>
+          {{if and $.IsDM (ne .Kind "souls")}}
+            <form hx-post="/campaigns/{{$.Campaign.ID}}/battle/loot/{{.ID}}/remove" hx-target="#battle-board" hx-swap="outerHTML">
+              <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+              <button class="btn-ghost" type="submit">{{ t "common.remove" }}</button>
+            </form>
+          {{end}}
+        </li>
+      {{end}}
+    </ul>
+  {{else}}
+    <p class="mt-2 text-sm text-parchment/45">{{ t "battle.loot.empty" }}</p>
+  {{end}}
+
   {{if .IsDM}}
     <form class="mt-6" method="post" action="/campaigns/{{.Campaign.ID}}/battle/dismiss">
       <input type="hidden" name="csrf_token" value="{{.CSRF}}">

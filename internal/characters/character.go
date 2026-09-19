@@ -35,6 +35,9 @@ type Character struct {
 	DeathSuccess     int
 	DeathFail        int
 	ProficiencyBonus int
+	Gold             int
+	Souls            int
+	SoulsCap         int
 	Effects          []rules.Effect
 	CreatedAt        time.Time
 	Race             *catalog.Race
@@ -47,6 +50,8 @@ type Character struct {
 	SaveMarks        []rules.SaveMark
 	Inventory        []InventoryItem
 	GrantedSpells    []GrantedSpell
+	Mutations        []Mutation
+	Companions       []Companion
 }
 
 // LearnedSpell is a catalog spell on the character (prepared is a subset).
@@ -88,7 +93,7 @@ func (c *Character) BaseScores() rules.AbilityScores {
 }
 
 func (c *Character) Scores() rules.AbilityScores {
-	return c.BaseScores().Add(c.EquippedGrants().Ability)
+	return c.BaseScores().Add(c.AllGrants().Ability)
 }
 
 func (c *Character) CombatInput() rules.CombatInput {
@@ -271,7 +276,7 @@ func (c *Character) EffectiveSkillMark(slug string) rules.SkillMark {
 			break
 		}
 	}
-	if c.EquippedGrants().HasSkill(slug) {
+	if c.AllGrants().HasSkill(slug) {
 		mark.Proficient = true
 	}
 	return mark

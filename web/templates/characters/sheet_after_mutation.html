@@ -1,0 +1,7 @@
+{{template "characters/sheet_mutations.html" .}}
+{{template "characters/sheet_vitals.html" .}}
+{{template "characters/sheet_skills.html" .}}
+{{template "characters/sheet_inventory.html" .}}
+<div id="sheet-magic" hx-swap-oob="true" hx-on:close-spell-modal="document.getElementById('spell-use-modal').close()">
+  {{template "characters/sheet_magic.html" .}}
+</div>

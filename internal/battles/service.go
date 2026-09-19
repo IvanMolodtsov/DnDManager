@@ -14,15 +14,18 @@ import (
 )
 
 var (
-	ErrForbidden   = errors.New("forbidden")
-	ErrNotFound    = errors.New("battle not found")
-	ErrNotMember   = campaigns.ErrNotMember
-	ErrQty         = errors.New("quantity required")
-	ErrWrongStatus = errors.New("battle is not in that step")
-	ErrUnit        = errors.New("unit not found")
-	ErrAlreadyDead = errors.New("already dead")
-	ErrNotDying    = errors.New("not making death saves")
-	ErrStats       = errors.New("invalid combat stats")
+	ErrForbidden      = errors.New("forbidden")
+	ErrNotFound       = errors.New("battle not found")
+	ErrNotMember      = campaigns.ErrNotMember
+	ErrQty            = errors.New("quantity required")
+	ErrWrongStatus    = errors.New("battle is not in that step")
+	ErrUnit           = errors.New("unit not found")
+	ErrAlreadyDead    = errors.New("already dead")
+	ErrNotDying       = errors.New("not making death saves")
+	ErrStats          = errors.New("invalid combat stats")
+	ErrCompanionSpell = errors.New("summon spell not available")
+	ErrCompanionType  = errors.New("summon type mismatch")
+	ErrLootName       = errors.New("loot name required")
 )
 
 // Service mutates encounters. View is RequireMember; start/mutate is campaign DM.
@@ -69,7 +72,12 @@ func (s *Service) load(id int64) (*Battle, error) {
 	if err := s.attachEffects(units); err != nil {
 		return nil, err
 	}
+	loot, err := s.Repo.ListLoot(id)
+	if err != nil {
+		return nil, err
+	}
 	b.Units = units
+	b.Loot = loot
 	return b, nil
 }
 
@@ -132,7 +140,7 @@ func (s *Service) AddMonsters(campaignID, userID, catalogID int64, qty int, lang
 	if err != nil {
 		return nil, err
 	}
-	if b.Status != StatusSetupMonsters {
+	if b.Status != StatusSetupMonsters && b.Status != StatusFighting {
 		return nil, ErrWrongStatus
 	}
 	if qty < 1 || qty > 20 {
@@ -146,6 +154,11 @@ func (s *Service) AddMonsters(campaignID, userID, catalogID int64, qty int, lang
 	ac := m.FightAC()
 	scores := scoresFromMonster(m)
 	snap := snapshotFromMonster(m)
+	source := m.ArticleURL()
+	cr, crLabel := m.CR, strings.TrimSpace(m.CRLabel)
+	if crLabel == "" {
+		crLabel = "0"
+	}
 	existing := 0
 	for _, u := range b.Units {
 		if u.Kind == KindMonster && u.CatalogMonsterID == catalogID {
@@ -154,25 +167,37 @@ func (s *Service) AddMonsters(campaignID, userID, catalogID int64, qty int, lang
 				hpMax, hpCur, ac = u.HPMax, u.HPCurrent, u.AC
 				scores = u.Scores()
 				snap = u.ResistJSON
+				cr, crLabel = u.CR, u.CRLabel
+				if strings.TrimSpace(u.SourceURLRU) != "" {
+					source = u.SourceURLRU
+				}
 			}
 		}
 	}
 	base := m.Name(lang)
+	newIDs := map[int64]bool{}
 	for i := 1; i <= qty; i++ {
 		n := existing + i
 		u := Unit{
 			BattleID: b.ID, Kind: KindMonster, CatalogMonsterID: m.ID,
 			Name:      fmt.Sprintf("%s %d", base, n),
 			HPCurrent: hpCur, HPMax: hpMax, AC: ac,
-			ResistJSON: snap, SourceURLRU: m.ArticleURL(), SortOrder: len(b.Units) + i - 1,
+			ResistJSON: snap, SourceURLRU: source, SortOrder: len(b.Units) + i - 1,
+			CR: cr, CRLabel: crLabel,
 		}
 		u.SetScores(scores)
 		id, err := s.Repo.InsertUnit(&u)
 		if err != nil {
 			return nil, err
 		}
+		newIDs[id] = true
 		u.ID = id
 		b.Units = append(b.Units, u)
+	}
+	if b.Status == StatusFighting {
+		if err := s.insertIntoFightOrder(b, newIDs); err != nil {
+			return nil, err
+		}
 	}
 	s.broadcast(campaignID)
 	return s.load(b.ID)
@@ -183,7 +208,7 @@ func (s *Service) UpdateMonsterGroupStats(campaignID, userID, catalogID int64, s
 	if err != nil {
 		return nil, err
 	}
-	if b.Status != StatusSetupMonsters {
+	if b.Status != StatusSetupMonsters && b.Status != StatusFighting {
 		return nil, ErrWrongStatus
 	}
 	if !validGroupStats(st) {
@@ -314,12 +339,78 @@ func (s *Service) BeginInitiative(campaignID, userID int64) (*Battle, error) {
 		u.ID = id
 		b.Units = append(b.Units, u)
 	}
+	if err := s.ensureCompanionUnits(b, 0); err != nil {
+		return nil, err
+	}
 	b.Status = StatusSetupInit
 	if err := s.Repo.Update(b); err != nil {
 		return nil, err
 	}
 	s.broadcast(campaignID)
 	return s.load(b.ID)
+}
+
+func initiativeFormula(dex int) string {
+	return fmt.Sprintf("1d20%+d", rules.Modifier(dex))
+}
+
+func rollInitiativeOnto(u *Unit) (rules.RollResult, error) {
+	res, err := rules.RollFormula(initiativeFormula(u.DEX))
+	if err != nil {
+		return res, err
+	}
+	u.Initiative = res.Total
+	return res, nil
+}
+
+func activeIndexFor(units []Unit, activeID int64) int {
+	for _, u := range units {
+		if u.ID == activeID {
+			return u.SortOrder
+		}
+	}
+	return firstAbleIndex(units)
+}
+
+func (s *Service) persistUnits(units []Unit) error {
+	for i := range units {
+		if err := s.Repo.UpdateUnit(&units[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) insertIntoFightOrder(b *Battle, newIDs map[int64]bool) error {
+	fresh, err := s.load(b.ID)
+	if err != nil {
+		return err
+	}
+	activeID := int64(0)
+	if au := b.ActiveUnit(); au != nil {
+		activeID = au.ID
+	} else if au := fresh.ActiveUnit(); au != nil {
+		activeID = au.ID
+	}
+	for i := range fresh.Units {
+		u := &fresh.Units[i]
+		if !newIDs[u.ID] {
+			continue
+		}
+		if _, err := rollInitiativeOnto(u); err != nil {
+			return err
+		}
+		if err := s.Repo.UpdateUnit(u); err != nil {
+			return err
+		}
+	}
+	sorted := sortUnitsByInitiative(fresh.Units)
+	if err := s.persistUnits(sorted); err != nil {
+		return err
+	}
+	fresh.Units = sorted
+	fresh.ActiveIndex = activeIndexFor(sorted, activeID)
+	return s.Repo.Update(fresh)
 }
 
 func (s *Service) SetInitiative(campaignID, userID, unitID int64, value int) (*Battle, error) {
@@ -338,6 +429,9 @@ func (s *Service) SetInitiative(campaignID, userID, unitID int64, value int) (*B
 	if err := s.Repo.UpdateUnit(u); err != nil {
 		return nil, err
 	}
+	if err := s.copyInitiativeToFollowers(b, u); err != nil {
+		return nil, err
+	}
 	s.broadcast(campaignID)
 	return s.load(b.ID)
 }
@@ -354,18 +448,43 @@ func (s *Service) RollInitiative(campaignID, userID, unitID int64) (rules.RollRe
 	if err != nil {
 		return rules.RollResult{}, nil, err
 	}
-	mod := rules.Modifier(u.DEX)
-	res, err := rules.RollFormula(fmt.Sprintf("1d20%+d", mod))
+	res, err := rollInitiativeOnto(u)
 	if err != nil {
 		return res, nil, err
 	}
-	u.Initiative = res.Total
 	if err := s.Repo.UpdateUnit(u); err != nil {
+		return res, nil, err
+	}
+	if err := s.copyInitiativeToFollowers(b, u); err != nil {
 		return res, nil, err
 	}
 	s.broadcast(campaignID)
 	got, err := s.load(b.ID)
 	return res, got, err
+}
+
+func (s *Service) RollMonsterInitiatives(campaignID, userID int64) (*Battle, error) {
+	b, err := s.dmBattle(campaignID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if b.Status != StatusSetupInit {
+		return nil, ErrWrongStatus
+	}
+	for i := range b.Units {
+		u := &b.Units[i]
+		if !u.IsMonster() {
+			continue
+		}
+		if _, err := rollInitiativeOnto(u); err != nil {
+			return nil, err
+		}
+		if err := s.Repo.UpdateUnit(u); err != nil {
+			return nil, err
+		}
+	}
+	s.broadcast(campaignID)
+	return s.load(b.ID)
 }
 
 func (s *Service) ConfirmInitiative(campaignID, userID int64) (*Battle, error) {
@@ -376,24 +495,9 @@ func (s *Service) ConfirmInitiative(campaignID, userID int64) (*Battle, error) {
 	if b.Status != StatusSetupInit {
 		return nil, ErrWrongStatus
 	}
-	units := append([]Unit(nil), b.Units...)
-	sort.SliceStable(units, func(i, j int) bool {
-		if units[i].Initiative != units[j].Initiative {
-			return units[i].Initiative > units[j].Initiative
-		}
-		if units[i].DEX != units[j].DEX {
-			return units[i].DEX > units[j].DEX
-		}
-		if units[i].Name != units[j].Name {
-			return units[i].Name < units[j].Name
-		}
-		return units[i].ID < units[j].ID
-	})
-	for i := range units {
-		units[i].SortOrder = i
-		if err := s.Repo.UpdateUnit(&units[i]); err != nil {
-			return nil, err
-		}
+	units := sortUnitsByInitiative(b.Units)
+	if err := s.persistUnits(units); err != nil {
+		return nil, err
 	}
 	b.Units = units
 	b.Status = StatusFighting
@@ -510,14 +614,7 @@ func (s *Service) MarkEscaped(campaignID, userID, unitID int64) (*Battle, error)
 }
 
 func (s *Service) ApplyUnitDamage(campaignID, userID, unitID int64, amount int, dmgType string) (rules.DamageResult, *Battle, error) {
-	b, err := s.dmBattle(campaignID, userID)
-	if err != nil {
-		return rules.DamageResult{}, nil, err
-	}
-	if b.Status != StatusFighting {
-		return rules.DamageResult{}, nil, ErrWrongStatus
-	}
-	u, err := s.unitIn(b, unitID)
+	b, u, err := s.requireUnitCombatEdit(campaignID, userID, unitID)
 	if err != nil {
 		return rules.DamageResult{}, nil, err
 	}
@@ -557,20 +654,14 @@ func (s *Service) ApplyUnitDamage(campaignID, userID, unitID int64, amount int, 
 	if err := s.Repo.UpdateUnit(u); err != nil {
 		return res, nil, err
 	}
+	s.persistCompanionHP(u)
 	s.broadcast(campaignID)
 	got, err := s.load(b.ID)
 	return res, got, err
 }
 
 func (s *Service) ApplyUnitHeal(campaignID, userID, unitID int64, amount int) (*Battle, error) {
-	b, err := s.dmBattle(campaignID, userID)
-	if err != nil {
-		return nil, err
-	}
-	if b.Status != StatusFighting {
-		return nil, ErrWrongStatus
-	}
-	u, err := s.unitIn(b, unitID)
+	b, u, err := s.requireUnitCombatEdit(campaignID, userID, unitID)
 	if err != nil {
 		return nil, err
 	}
@@ -598,19 +689,13 @@ func (s *Service) ApplyUnitHeal(campaignID, userID, unitID int64, amount int) (*
 	if err := s.Repo.UpdateUnit(u); err != nil {
 		return nil, err
 	}
+	s.persistCompanionHP(u)
 	s.broadcast(campaignID)
 	return s.load(b.ID)
 }
 
 func (s *Service) AdjustUnitTemp(campaignID, userID, unitID int64, delta int) (*Battle, error) {
-	b, err := s.dmBattle(campaignID, userID)
-	if err != nil {
-		return nil, err
-	}
-	if b.Status != StatusFighting {
-		return nil, ErrWrongStatus
-	}
-	u, err := s.unitIn(b, unitID)
+	b, u, err := s.requireUnitCombatEdit(campaignID, userID, unitID)
 	if err != nil {
 		return nil, err
 	}
@@ -741,6 +826,7 @@ func (s *Service) unitIn(b *Battle, unitID int64) (*Unit, error) {
 }
 
 func (s *Service) hydratePCs(b *Battle, units []Unit) error {
+	owners := map[int64]int64{}
 	for i := range units {
 		u := &units[i]
 		if !u.IsPC() || u.CharacterID == 0 {
@@ -750,6 +836,7 @@ func (s *Service) hydratePCs(b *Battle, units []Unit) error {
 		if err != nil {
 			continue
 		}
+		owners[ch.ID] = ch.OwnerID
 		combat := rules.DeriveCombat(ch.CombatInput())
 		u.Name = ch.Name
 		u.HPCurrent = ch.HPCurrent
@@ -762,8 +849,31 @@ func (s *Service) hydratePCs(b *Battle, units []Unit) error {
 		u.Dead = ch.DeathFail >= 3
 		u.Knocked = ch.HPCurrent == 0 && !u.Dead && !u.Escaped
 		u.Effects = ch.Effects
+		u.OwnerUserID = ch.OwnerID
 		if err := s.Repo.UpdateUnit(u); err != nil {
 			return err
+		}
+	}
+	for i := range units {
+		u := &units[i]
+		if !u.IsFollower() {
+			continue
+		}
+		u.OwnerUserID = owners[u.CharacterID]
+		if u.OwnerUserID == 0 && u.CharacterID != 0 {
+			if ch, err := s.Characters.Get(u.CharacterID); err == nil {
+				u.OwnerUserID = ch.OwnerID
+			}
+		}
+		if u.IsCompanion() && u.CompanionID != 0 && u.CharacterID != 0 {
+			if row, err := s.Characters.Repo.Companion(u.CharacterID, u.CompanionID); err == nil {
+				u.HPCurrent = row.HPCurrent
+				u.HPMax = row.HPMax
+				u.Name = row.DisplayName("en")
+				if row.HPCurrent == 0 {
+					u.Dead = true
+				}
+			}
 		}
 	}
 	_ = b
@@ -1005,6 +1115,12 @@ func ErrorKey(err error) string {
 		return "error.hp.damage_type"
 	case errors.Is(err, catalog.ErrNotFound):
 		return "error.notfound"
+	case errors.Is(err, ErrCompanionSpell):
+		return "error.companion.spell"
+	case errors.Is(err, ErrCompanionType), errors.Is(err, characters.ErrCompanionType):
+		return "error.companion.kind"
+	case errors.Is(err, ErrLootName):
+		return "error.loot.name"
 	default:
 		return "error.generic"
 	}

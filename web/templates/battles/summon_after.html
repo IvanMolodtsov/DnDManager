@@ -1,0 +1,5 @@
+<div id="summon-body">
+  <p class="text-sm text-parchment/70">{{ t "battle.summon.done" }}</p>
+  <button type="button" class="btn-ghost mt-3" onclick="document.getElementById('summon-modal').close()">{{ t "common.close" }}</button>
+</div>
+{{if .OOBBattle}}{{template "battles/board.html" .}}{{end}}

@@ -69,6 +69,20 @@
   <div id="item-add-body"></div>
 </dialog>
 
+<dialog id="wallet-modal" class="sheet-dialog">
+  <div id="wallet-body"></div>
+</dialog>
+
+<div id="sheet-companions-wrap">
+  {{template "characters/sheet_companions.html" .}}
+</div>
+
+{{template "characters/sheet_mutations.html" .}}
+
+<dialog id="companion-edit-modal" class="sheet-dialog item-dialog">
+  <div id="companion-edit-body"></div>
+</dialog>
+
 <section class="card mt-6">
   <h3 class="font-display text-gold">{{ t "character.features" }}</h3>
   {{if .Character.Features}}
@@ -105,6 +119,10 @@
       var d = document.getElementById('status-add-modal');
       if (d) d.showModal();
     }
+    if (e.detail && e.detail.target && e.detail.target.id === 'companion-edit-body') {
+      var d = document.getElementById('companion-edit-modal');
+      if (d) d.showModal();
+    }
   });
   document.body.addEventListener('close-spell-modal', function () {
     var d = document.getElementById('spell-use-modal');
@@ -114,6 +132,10 @@
     var d = document.getElementById('item-add-modal');
     if (d) d.close();
   });
+  document.body.addEventListener('close-wallet-modal', function () {
+    var d = document.getElementById('wallet-modal');
+    if (d) d.close();
+  });
   (function () {
     var id = {{.Character.ID}};
     if (!id || typeof EventSource === 'undefined') return;
@@ -121,6 +143,8 @@
     es.addEventListener('vitals', function () {
       if (typeof htmx === 'undefined') return;
       htmx.ajax('GET', '/characters/' + id + '/vitals', {target: '#sheet-vitals', swap: 'outerHTML'});
+      htmx.ajax('GET', '/characters/' + id + '/inventory', {target: '#sheet-inventory', swap: 'outerHTML'});
+      htmx.ajax('GET', '/characters/' + id + '/mutations', {target: '#sheet-mutations', swap: 'outerHTML'});
     });
   })();
 </script>

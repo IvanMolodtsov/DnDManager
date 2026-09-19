@@ -33,7 +33,7 @@
           </span>
           <span>{{ t (printf "character.status.source.%s" .Source) }}</span>
           <span>
-            {{if or (and $.IsOwner (not .Hidden)) $.IsDM}}
+            {{if and (ne .Slug "dead") (or (and $.IsOwner (not .Hidden)) $.IsDM)}}
               <form hx-post="/characters/{{$.Character.ID}}/effects/{{.ID}}/remove" hx-target="#sheet-vitals" hx-swap="outerHTML">
                 <input type="hidden" name="csrf_token" value="{{$.CSRF}}">
                 <button class="btn-ghost" type="submit">{{ t "common.remove" }}</button>
