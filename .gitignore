@@ -7,3 +7,4 @@
 .env.local
 .env.*.local
 .vercel
+.cursor/mcp.json
