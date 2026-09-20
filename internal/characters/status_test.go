@@ -137,11 +137,11 @@ func TestOwnerCannotDismissHidden(t *testing.T) {
 
 func testControllerFrom(t *testing.T, svc *Service, uid, cid int64) (*Controller, int64, int64) {
 	t.Helper()
-	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	bundle, err := platform.LoadBundle(platform.AssetDir("locales"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	render, err := platform.NewRenderer(platform.AssetDir(filepath.Join("web", "templates")), bundle)
 	if err != nil {
 		t.Fatal(err)
 	}

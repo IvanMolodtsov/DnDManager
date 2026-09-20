@@ -25,7 +25,7 @@ func testSvc(t *testing.T) (*Service, int64, int64) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+	if err := platform.Migrate(db, platform.AssetDir("migrations")); err != nil {
 		t.Fatal(err)
 	}
 	userRepo := &users.Repository{DB: db}
@@ -316,11 +316,11 @@ func TestMemberSeesNamesNotMonsterHP(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	bundle, err := platform.LoadBundle(platform.AssetDir("locales"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	render, err := platform.NewRenderer(platform.AssetDir(filepath.Join("web", "templates")), bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,11 +381,11 @@ func TestPlayerSetupHidesMonsterCRAndEdit(t *testing.T) {
 	if _, err := svc.Campaigns.Join(camp.InviteCode, playerID); err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	bundle, err := platform.LoadBundle(platform.AssetDir("locales"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	render, err := platform.NewRenderer(platform.AssetDir(filepath.Join("web", "templates")), bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -569,11 +569,11 @@ func TestEditMonsterStatsModal(t *testing.T) {
 	if _, err := svc.AddMonsters(cid, dmID, gid, 2, "en"); err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	bundle, err := platform.LoadBundle(platform.AssetDir("locales"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	render, err := platform.NewRenderer(platform.AssetDir(filepath.Join("web", "templates")), bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -928,11 +928,11 @@ func TestMonsterStatusDMOnlyHTML(t *testing.T) {
 	if _, err := svc.Campaigns.Join(camp.InviteCode, playerID); err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	bundle, err := platform.LoadBundle(platform.AssetDir("locales"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	render, err := platform.NewRenderer(platform.AssetDir(filepath.Join("web", "templates")), bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1237,11 +1237,11 @@ func TestAddMonstersModalDMOnly(t *testing.T) {
 	if _, err := svc.Campaigns.Join(camp.InviteCode, playerID); err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	bundle, err := platform.LoadBundle(platform.AssetDir("locales"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	render, err := platform.NewRenderer(platform.AssetDir(filepath.Join("web", "templates")), bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1316,11 +1316,11 @@ func TestSetupInitShowsBulkMonsterRoll(t *testing.T) {
 	if _, err := svc.BeginInitiative(cid, dmID); err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	bundle, err := platform.LoadBundle(platform.AssetDir("locales"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	render, err := platform.NewRenderer(platform.AssetDir(filepath.Join("web", "templates")), bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
