@@ -1,11 +1,13 @@
 package platform
 
 import (
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 func TestListenAddr(t *testing.T) {
@@ -151,5 +153,27 @@ func TestAssetDirAPINested(t *testing.T) {
 	got := AssetDir("locales")
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
+func TestUnpackAssets(t *testing.T) {
+	fsys := fstest.MapFS{
+		"locales/en.json":  {Data: []byte(`{"ok":"1"}`)},
+		"web/static/x.css": {Data: []byte("body{}")},
+	}
+	dir, err := UnpackAssets(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	raw, err := os.ReadFile(filepath.Join(dir, "locales", "en.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != `{"ok":"1"}` {
+		t.Fatalf("got %q", raw)
+	}
+	if _, err := fs.Stat(os.DirFS(dir), "web/static/x.css"); err != nil {
+		t.Fatal(err)
 	}
 }

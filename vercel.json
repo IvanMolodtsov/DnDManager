@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "sh scripts/bundle-api-assets.sh",
   "functions": {
     "api/index.go": {
       "maxDuration": 300,
