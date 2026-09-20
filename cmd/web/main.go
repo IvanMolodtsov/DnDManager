@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"dndmanager/internal/app"
+	"dndmanager/app"
 	"dndmanager/internal/platform"
 )
 

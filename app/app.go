@@ -1,4 +1,6 @@
 // Package app wires the HTTP handler used by cmd/web (Air) and the Vercel api/ entry.
+// It is public (not internal/) because Vercel compiles api/index.go outside the
+// module tree, where Go forbids importing dndmanager/internal/*.
 // Catalog lives in internal/catalog. Future mount points:
 //   - internal/items     — inventory
 //   - internal/abilities — spells and remaining class options

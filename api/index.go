@@ -6,11 +6,13 @@ import (
 	"os"
 	"sync"
 
-	"dndmanager/internal/app"
+	"dndmanager/app"
 )
 
 // Handler is the Vercel Go function entry (Fluid Compute, not Edge).
-// Local Air still uses cmd/web. SSE max duration is 300s (vercel.json).
+// Imports dndmanager/app (public): this file is compiled outside the module, so
+// dndmanager/internal/* is illegal. Local Air still uses cmd/web.
+// SSE max duration is 300s (vercel.json).
 var (
 	once    sync.Once
 	handler http.Handler
