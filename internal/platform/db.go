@@ -9,8 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 	_ "modernc.org/sqlite"
 )
+
+// Remote HTTP pool size for Turso/libSQL (serverless; a handful of table players).
+const remoteMaxOpenConns = 4
 
 // OpenDB creates dataDir if needed and opens dataDir/dnd.db with foreign keys on.
 // Tests and local Air use this (ephemeral temp dirs or DATA_DIR/dnd.db).
@@ -25,9 +29,9 @@ func OpenDB(dataDir string) (*sql.DB, error) {
 // OpenFromEnv opens the campaign database.
 //
 // Local (Air / go run): DATA_DIR/dnd.db via modernc.org/sqlite (default DATA_DIR=data).
-// Hosted: set DATABASE_URL or TURSO_DATABASE_URL to a persistent libSQL/Turso URL.
-// The Vercel function filesystem is ephemeral — do not rely on DATA_DIR there.
-// Remote driver wiring is paused until Ivan provisions Marketplace Turso (see AGENTS.md).
+// Hosted: set DATABASE_URL or TURSO_DATABASE_URL to a libsql:// (or https://) URL and
+// TURSO_AUTH_TOKEN. Opened with the HTTP libSQL driver (no CGO). The Vercel function
+// filesystem is ephemeral — do not rely on DATA_DIR there.
 func OpenFromEnv() (*sql.DB, error) {
 	if dsn := strings.TrimSpace(os.Getenv("DATABASE_URL")); dsn != "" {
 		return openConfiguredDSN(dsn, os.Getenv("TURSO_AUTH_TOKEN"))
@@ -40,9 +44,8 @@ func OpenFromEnv() (*sql.DB, error) {
 
 func openConfiguredDSN(dsn, authToken string) (*sql.DB, error) {
 	if IsRemoteSQLiteDSN(dsn) {
-		return nil, fmt.Errorf("remote sqlite %s: Turso/libSQL driver is not wired yet (paused before Marketplace provision). Local Air still uses DATA_DIR/dnd.db. When ready: vercel integration add turso, set TURSO_DATABASE_URL + TURSO_AUTH_TOKEN, then go get turso.tech/database/tursogo-serverless", redactDSN(dsn))
+		return openLibSQL(dsn, authToken)
 	}
-	_ = authToken
 	if strings.HasPrefix(dsn, "file:") {
 		return openSQLiteFile(ensureSQLitePragmas(dsn))
 	}
@@ -57,6 +60,42 @@ func openConfiguredDSN(dsn, authToken string) (*sql.DB, error) {
 		return openSQLiteFile(fileDSN)
 	}
 	return OpenDB(Getenv("DATA_DIR", "data"))
+}
+
+func openLibSQL(dsn, authToken string) (*sql.DB, error) {
+	full, err := libsqlDSN(dsn, authToken)
+	if err != nil {
+		return nil, err
+	}
+	db, err := sql.Open("libsql", full)
+	if err != nil {
+		return nil, fmt.Errorf("open libsql %s: %w", redactDSN(dsn), err)
+	}
+	db.SetMaxOpenConns(remoteMaxOpenConns)
+	return db, nil
+}
+
+// libsqlDSN returns a driver DSN: libsql://host?authToken=… (Turso HTTP form).
+// TURSO_AUTH_TOKEN is appended when the URL has no authToken/auth_token/jwt yet.
+func libsqlDSN(dsn, authToken string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(dsn))
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("invalid remote sqlite dsn %s", redactDSN(dsn))
+	}
+	if strings.EqualFold(u.Scheme, "turso") {
+		u.Scheme = "libsql"
+	}
+	q := u.Query()
+	hasToken := q.Get("authToken") != "" || q.Get("auth_token") != "" || q.Get("jwt") != ""
+	token := strings.TrimSpace(authToken)
+	if !hasToken {
+		if token == "" {
+			return "", fmt.Errorf("remote sqlite %s: TURSO_AUTH_TOKEN is required", redactDSN(dsn))
+		}
+		q.Set("authToken", token)
+		u.RawQuery = q.Encode()
+	}
+	return u.String(), nil
 }
 
 // IsRemoteSQLiteDSN is true for Turso / libSQL HTTP URLs (not local file: DSNs).

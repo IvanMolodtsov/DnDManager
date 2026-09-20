@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,15 +49,54 @@ func TestIsRemoteSQLiteDSN(t *testing.T) {
 	if !IsRemoteSQLiteDSN("libsql://example.turso.io") {
 		t.Fatal("libsql")
 	}
+	if !IsRemoteSQLiteDSN("https://example.turso.io") {
+		t.Fatal("https")
+	}
 	if IsRemoteSQLiteDSN("file:data/dnd.db") {
 		t.Fatal("file dsn is local")
 	}
 }
 
-func TestOpenFromEnvRemotePaused(t *testing.T) {
+func TestLibsqlDSNAuthToken(t *testing.T) {
+	got, err := libsqlDSN("libsql://example.turso.io", "secret-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Scheme != "libsql" || u.Host != "example.turso.io" {
+		t.Fatalf("shape: %q", got)
+	}
+	if u.Query().Get("authToken") != "secret-token" {
+		t.Fatalf("authToken: %q", got)
+	}
+
+	already := "libsql://example.turso.io?authToken=embedded"
+	got, err = libsqlDSN(already, "ignored")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err = url.Parse(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Query().Get("authToken") != "embedded" {
+		t.Fatalf("kept embedded token, got %q", got)
+	}
+
+	_, err = libsqlDSN("libsql://example.turso.io", "")
+	if err == nil || !strings.Contains(err.Error(), "TURSO_AUTH_TOKEN") {
+		t.Fatalf("expected token required, got %v", err)
+	}
+}
+
+func TestOpenFromEnvRemoteRequiresToken(t *testing.T) {
 	t.Setenv("DATABASE_URL", "libsql://example.turso.io")
+	t.Setenv("TURSO_AUTH_TOKEN", "")
 	_, err := OpenFromEnv()
-	if err == nil || !strings.Contains(err.Error(), "not wired yet") {
+	if err == nil || !strings.Contains(err.Error(), "TURSO_AUTH_TOKEN") {
 		t.Fatalf("got %v", err)
 	}
 }
