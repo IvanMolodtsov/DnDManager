@@ -2,7 +2,6 @@ package characters
 
 import (
 	"errors"
-	"path/filepath"
 	"testing"
 
 	"dndmanager/internal/campaigns"
@@ -20,7 +19,7 @@ func testSvc(t *testing.T) (*Service, int64, int64) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+	if err := platform.Migrate(db, platform.AssetDir("migrations")); err != nil {
 		t.Fatal(err)
 	}
 	userRepo := &users.Repository{DB: db}

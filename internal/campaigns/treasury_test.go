@@ -236,7 +236,7 @@ func testCamp(t *testing.T) (*Service, int64, int64, int64) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+	if err := platform.Migrate(db, platform.AssetDir("migrations")); err != nil {
 		t.Fatal(err)
 	}
 	userRepo := &users.Repository{DB: db}
@@ -261,11 +261,11 @@ func testCamp(t *testing.T) (*Service, int64, int64, int64) {
 
 func testCampController(t *testing.T, svc *Service, chars CharacterLister) *Controller {
 	t.Helper()
-	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	bundle, err := platform.LoadBundle(platform.AssetDir("locales"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	render, err := platform.NewRenderer(platform.AssetDir(filepath.Join("web", "templates")), bundle)
 	if err != nil {
 		t.Fatal(err)
 	}

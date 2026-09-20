@@ -143,7 +143,7 @@ func main() {
 	if filepath.Base(root) == "genitems" {
 		root = filepath.Join(root, "..", "..")
 	}
-	outPath := filepath.Join(root, "migrations", "010_items_catalog.sql")
+	outPath := filepath.Join(root, "api", "migrations", "010_items_catalog.sql")
 
 	client := &http.Client{Timeout: 45 * time.Second}
 
