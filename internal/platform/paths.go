@@ -7,10 +7,11 @@ import (
 
 // AssetDir resolves a repo-relative directory (web/templates, locales, …).
 // Order: ASSET_ROOT, cwd and parents, then the executable directory.
+// At each root it checks rel first (local `go run ./cmd/web`), then api/rel
+// (Vercel: @vercel/go includeFiles globs from api/, after install copies).
 func AssetDir(rel string) string {
 	if root := os.Getenv("ASSET_ROOT"); root != "" {
-		p := filepath.Join(root, rel)
-		if isDir(p) {
+		if p := firstDir(root, rel); p != "" {
 			return p
 		}
 	}
@@ -30,8 +31,7 @@ func AssetDir(rel string) string {
 func walkFor(start, rel string) string {
 	dir := start
 	for i := 0; i < 8; i++ {
-		p := filepath.Join(dir, rel)
-		if isDir(p) {
+		if p := firstDir(dir, rel); p != "" {
 			return p
 		}
 		parent := filepath.Dir(dir)
@@ -39,6 +39,18 @@ func walkFor(start, rel string) string {
 			break
 		}
 		dir = parent
+	}
+	return ""
+}
+
+func firstDir(root, rel string) string {
+	for _, p := range []string{
+		filepath.Join(root, rel),
+		filepath.Join(root, "api", rel),
+	} {
+		if isDir(p) {
+			return p
+		}
 	}
 	return ""
 }
