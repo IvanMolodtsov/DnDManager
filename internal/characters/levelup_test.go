@@ -17,11 +17,11 @@ import (
 func testController(t *testing.T) (*Controller, int64, int64) {
 	t.Helper()
 	svc, uid, cid := testSvc(t)
-	bundle, err := platform.LoadBundle(filepath.Join("..", "..", "locales"))
+	bundle, err := platform.LoadBundle(platform.AssetDir("locales"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	render, err := platform.NewRenderer(filepath.Join("..", "..", "web", "templates"), bundle)
+	render, err := platform.NewRenderer(platform.AssetDir(filepath.Join("web", "templates")), bundle)
 	if err != nil {
 		t.Fatal(err)
 	}
