@@ -90,6 +90,7 @@ func WriteSessionCookie(w http.ResponseWriter, s *Session) {
 		Expires:  s.ExpiresAt,
 		MaxAge:   int(sessionTTL.Seconds()),
 		HttpOnly: true,
+		Secure:   CookieSecure(),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -101,6 +102,7 @@ func ClearSessionCookie(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   CookieSecure(),
 		SameSite: http.SameSiteLaxMode,
 	})
 }

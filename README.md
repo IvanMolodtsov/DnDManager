@@ -16,10 +16,37 @@ Windows: `./start.ps1` or `scripts/start.ps1` (Air hot reload — restarts when 
 
 | Env | Default | |
 | --- | --- | --- |
-| `ADDR` | `:8080` | Listen address |
-| `DATA_DIR` | `data` | SQLite directory (`dnd.db`) |
+| `ADDR` | `:8080` | Listen address (`PORT` is used only if `ADDR` is unset, for Vercel) |
+| `DATA_DIR` | `data` | SQLite directory (`dnd.db`) when no remote URL is set |
+| `DATABASE_URL` / `TURSO_DATABASE_URL` | (unset) | Hosted Turso DSN (`libsql://…`). Local file fallback otherwise. |
+| `TURSO_AUTH_TOKEN` | (unset) | Turso auth token (secret — Vercel Production env, never git) |
+| `COOKIE_SECURE` | off locally; on when `VERCEL=1` | Session cookie `Secure` flag |
+
+Copy `.env.example` for names only. `.env` / `.env.local` are gitignored. **Do not commit `data/` or secrets.**
 
 Open http://localhost:8080. The first registered user is **Admin**; later accounts are players.
+
+## Hosting
+
+Live site is **`main`** on Vercel (Production Branch = `main`; Preview deploys disabled — no URL for PRs or `develop`). Feature PRs target **`develop`**. Database is Turso over HTTP (`libsql-client-go`, no CGO). Local Air still uses `DATA_DIR/dnd.db`.
+
+First migrate can take tens of seconds (catalog seed). Optional safety before the first Vercel hit:
+
+```bash
+DATABASE_URL=libsql://YOUR-DB.turso.io TURSO_AUTH_TOKEN=… go run ./cmd/web
+```
+
+Production-only env: `TURSO_DATABASE_URL` or `DATABASE_URL`, plus `TURSO_AUTH_TOKEN`. `VERCEL=1` is set by the platform.
+
+## Release
+
+From a clean `develop` (GitHub Release + `vX.Y.Z` tag; notes from commits/PRs since the last tag):
+
+```powershell
+./scripts/release.ps1 1.2.0
+```
+
+Unix: `./scripts/release.sh 1.2.0`. Fetches, checks out `main`, merges `develop` (no rewrite / no force-push), tags, pushes `main` + tag, and `gh release create`. Vercel Production deploy starts from that `main` push. Protect `main` on GitHub (not a `production` branch).
 
 ## Using it
 

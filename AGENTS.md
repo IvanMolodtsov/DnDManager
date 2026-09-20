@@ -1,14 +1,14 @@
 # DnDManager — agent context
 
-Local D&D 5e **2014** campaign/character manager for ~5 people. Owner: **Ivan**. Repo: https://github.com/IvanMolodtsov/DnDManager. Default branch: **main** (no `master`).
+Local D&D 5e **2014** campaign/character manager for ~5 people. Owner: **Ivan**. Repo: https://github.com/IvanMolodtsov/DnDManager. Default / live branch: **main** (Vercel Production; no `master`). Integration branch: **develop** (feature PRs).
 
 Keep this file and `.cursor/rules/project-context.mdc` in sync when product behavior changes.
 
 ## Stack
 
-- Go + SQLite (`modernc.org/sqlite`). HTMX vendored. EN/RU i18n. **No Node.**
+- Go + SQLite (`modernc.org/sqlite` locally). Hosted Turso via `github.com/tursodatabase/libsql-client-go/libsql` (HTTP, no CGO). HTMX vendored. EN/RU i18n. **No Node.**
 - Tailwind is **compiled** into `web/static/css/app.css`. **Do not use the Tailwind Play CDN** — it replaced the compiled sheet and broke the look. Append small extras at the end of `app.css` if needed.
-- Run from repo root: `./start.ps1` / `./start.sh` (Air hot reload, `.air.toml`). One-shot: `scripts/start-once.ps1` / `scripts/start-once.sh` or `go run ./cmd/web`. Tests: `go test ./...`.
+- Run from repo root: `./start.ps1` / `./start.sh` (Air hot reload, `.air.toml`). One-shot: `scripts/start-once.ps1` / `scripts/start-once.sh` or `go run ./cmd/web`. Tests: `go test ./...`. Release: `./scripts/release.ps1 1.2.0` (Unix: `scripts/release.sh`).
 - Air rebuilds on `.go` / `.html` / `.json` / `.sql` / `.css`. New SQL runs on process start (Air restart is enough).
 - **SQLite MCP** (project `.cursor/mcp.json`, server `dndmanager-db`): read-only `list_tables` / `describe_table` / `query` against `data/dnd.db`. Use it for live campaign data. Reload MCP in Cursor if the server is red. Do not commit `data/`.
 
@@ -113,6 +113,17 @@ Draft until confirm:
 - Campaign SSE event `battle` refreshes `#battle-board`. PC sheet vitals keep per-character SSE (same event also refreshes `#sheet-inventory` for gold/souls and `#sheet-mutations`).
 - **Companions** persist on `character_companions` (not `characters`). Sheet island `#sheet-companions`: owner build; DM read-only except combat HP. Gating: Ranger **Beast Master** (subclass in `018`, ranger level ≥ 3) one beast CR ≤ 1/4 Medium or smaller; **Find Familiar** known/prepared/grant or feature `pact-of-the-chain` (PHB list; Chain extras may attack); equipped figurine / dancing sword / `grant_companion`. No catalog “golem stones” — use the feature hook. Battle units `kind=companion` share the master’s initiative and sort immediately after (stable `companion_id`). HP like PCs (everyone sees it); CR/scores/resist stay DM-only. Owner or campaign DM `RequireCombatEdit` for companion HP. **Conjure** (animals / woodland beings / minor elementals / elemental / celestial) is battle-only `kind=summon` after the caster; not persisted; gone when the fight ends. No Wild Shape, no freeform pets.
 
+## Vercel (production)
+
+- **No Node.** Config is `vercel.json` (`framework: null`), not `vercel.ts` / `package.json`. Do not add the Tailwind Play CDN.
+- Entrypoint: `api/index.go` `Handler` wraps `app.New()` (same mux as `go run ./cmd/web`). Fluid Compute default; **do not** set Edge runtime. SSE stays (`/characters/{id}/events`, `/campaigns/{id}/battle/events`). `maxDuration` **300s** (platform default; connections drop at the cap, EventSource retries). In-process vitals/battle hubs are per instance — fine for one table; no Redis unless you outgrow that.
+- Bundle: `includeFiles` copies `web/`, `locales/`, `migrations/` next to the Go function. `platform.AssetDir` walks cwd/parents. Local run still uses repo-root relative paths.
+- **Git:** Vercel Production Branch = **`main`**. Preview deployments are **disabled** — PRs and `develop` must not get a URL. `develop` is the integration branch for feature PRs. The live SHA is whatever `main` points at. Protect **`main`** on GitHub: no feature PRs into it; updates via `scripts/release.ps1` (or a `develop` → `main` PR titled `Release vX.Y.Z`). Do not create a `production` git branch.
+- **Database:** Vercel’s filesystem is ephemeral. Local Air: `DATA_DIR` (default `data`) → `data/dnd.db` via `modernc.org/sqlite`. Hosted: `DATABASE_URL` or `TURSO_DATABASE_URL` (`libsql://…`) + `TURSO_AUTH_TOKEN`, opened with `github.com/tursodatabase/libsql-client-go/libsql` (`sql.Open("libsql", url+"?authToken="+token)`, HTTP, no CGO). Repositories stay on `database/sql`. MaxOpenConns 4. First request runs `platform.Migrate`; catalog seed (014) can take tens of seconds — Fluid `maxDuration` 300s is enough. Optional safety before the first Vercel hit: `DATABASE_URL=libsql://… TURSO_AUTH_TOKEN=… go run ./cmd/web` against Turso so cold start is not the first 014 apply. Empty Turso DB is fine; do not dump local `data/dnd.db` campaign rows.
+- **Release:** from a clean `develop`, `./scripts/release.ps1 1.2.0` (Unix: `scripts/release.sh`) fetches, checks out `main`, merges `develop` (no rewrite / no force-push), tags `v1.2.0`, pushes `main` + tag, and `gh release create` with notes from commits/PRs since the previous tag. Vercel Production deploy starts from the `main` push.
+- Env: `.env.example`. Production-only (not Preview): `TURSO_DATABASE_URL` / `DATABASE_URL`, `TURSO_AUTH_TOKEN`. `VERCEL=1` is set by the platform. Session cookie is a random id in SQLite (no `SESSION_SECRET`). `Secure` when `VERCEL=1` or `COOKIE_SECURE=1`. CSRF stays per-session in the DB.
+- Do not commit `.vercel/`, `data/`, or `.cursor/mcp.json`.
+
 ## Data
 
 - Migrations `001`–`020` (`020` = `character_mutations` + `character_mutation_features`). `data/` is not in git. Do not commit `.cursor/mcp.json`.
@@ -122,3 +133,4 @@ Draft until confirm:
 
 - Pause and ask Ivan on product forks.
 - Don’t commit secrets. Don’t commit unless asked. Don’t push unless asked.
+- Ship live via `scripts/release.ps1` (merge `develop` → `main`); do not force-push `main`.
