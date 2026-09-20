@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -58,4 +59,38 @@ func firstDir(root, rel string) string {
 func isDir(p string) bool {
 	st, err := os.Stat(p)
 	return err == nil && st.IsDir()
+}
+
+// UnpackAssets copies fsys (typically the module-root embed of web/locales/migrations)
+// into a temp directory so AssetDir/Migrate/FileServer can keep using paths.
+func UnpackAssets(fsys fs.FS) (string, error) {
+	root, err := os.MkdirTemp("", "dnd-assets-")
+	if err != nil {
+		return "", err
+	}
+	err = fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == "." {
+			return nil
+		}
+		dest := filepath.Join(root, filepath.FromSlash(path))
+		if d.IsDir() {
+			return os.MkdirAll(dest, 0o755)
+		}
+		b, err := fs.ReadFile(fsys, path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(dest, b, 0o644)
+	})
+	if err != nil {
+		os.RemoveAll(root)
+		return "", err
+	}
+	return root, nil
 }
