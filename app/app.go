@@ -11,10 +11,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"path/filepath"
 
-	dndroot "dndmanager"
 	"dndmanager/internal/battles"
 	"dndmanager/internal/campaigns"
 	"dndmanager/internal/catalog"
@@ -40,16 +38,6 @@ func (s *Server) Close() error {
 
 // New opens the DB, runs migrations, and returns the mux wrapped with sessions/CSRF.
 func New() (*Server, error) {
-	if os.Getenv("VERCEL") == "1" {
-		dir, err := platform.UnpackAssets(dndroot.AssetFS)
-		if err != nil {
-			return nil, fmt.Errorf("assets: %w", err)
-		}
-		if err := os.Setenv("ASSET_ROOT", dir); err != nil {
-			return nil, fmt.Errorf("assets: %w", err)
-		}
-	}
-
 	db, err := platform.OpenFromEnv()
 	if err != nil {
 		return nil, fmt.Errorf("db: %w", err)

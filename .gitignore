@@ -1,6 +1,9 @@
 /data/
 /node_modules/
 /tmp/
+/web/
+/locales/
+/migrations/
 *.exe
 *.exe~
 .env

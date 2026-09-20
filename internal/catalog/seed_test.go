@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,7 +14,7 @@ func TestPHBSeedAndWizardOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	mig := filepath.Join("..", "..", "migrations")
+	mig := platform.AssetDir("migrations")
 	if err := platform.Migrate(db, mig); err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +248,7 @@ func TestSearchItemsAndSpellsCaseInsensitive(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+	if err := platform.Migrate(db, platform.AssetDir("migrations")); err != nil {
 		t.Fatal(err)
 	}
 	svc := &Service{Repo: &Repository{DB: db}}
@@ -299,7 +298,7 @@ func TestMonsterCatalogGoblinAndSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+	if err := platform.Migrate(db, platform.AssetDir("migrations")); err != nil {
 		t.Fatal(err)
 	}
 	svc := &Service{Repo: &Repository{DB: db}}
@@ -466,7 +465,7 @@ func TestPHBConditionsSeed(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+	if err := platform.Migrate(db, platform.AssetDir("migrations")); err != nil {
 		t.Fatal(err)
 	}
 	svc := &Service{Repo: &Repository{DB: db}}
@@ -512,7 +511,7 @@ func TestLootMagicByRarityExcludesBases(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	if err := platform.Migrate(db, filepath.Join("..", "..", "migrations")); err != nil {
+	if err := platform.Migrate(db, platform.AssetDir("migrations")); err != nil {
 		t.Fatal(err)
 	}
 	svc := &Service{Repo: &Repository{DB: db}}
