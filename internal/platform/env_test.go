@@ -128,3 +128,28 @@ func TestAssetDir(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }
+
+func TestAssetDirAPINested(t *testing.T) {
+	t.Setenv("ASSET_ROOT", "")
+	root := t.TempDir()
+	want := filepath.Join(root, "api", "locales")
+	if err := os.MkdirAll(want, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(root, "tmp")
+	if err := os.Mkdir(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+	if err := os.Chdir(nested); err != nil {
+		t.Fatal(err)
+	}
+	got := AssetDir("locales")
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
