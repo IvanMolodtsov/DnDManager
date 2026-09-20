@@ -31,7 +31,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		handler = srv.Handler
 	})
 	if initErr != nil {
-		http.Error(w, "startup failed", http.StatusInternalServerError)
+		http.Error(w, "startup failed: "+initErr.Error(), http.StatusInternalServerError)
 		return
 	}
 	handler.ServeHTTP(w, r)
